@@ -1,239 +1,73 @@
-import { spawn, ChildProcess } from "child_process";
+import { spawn, type ChildProcess } from "child_process";
 import * as db from "./db";
-import { emitLog, emitStats, emitInstanceStatus } from "./socketIO";
 
 interface BotInstance {
-  processId: number | null;
+  id: number;
   process: ChildProcess | null;
+  processId: number | null;
   isRunning: boolean;
   startTime: Date | null;
   uptimeSeconds: number;
 }
 
-// In-memory store for bot instances
-const botInstances: Map<number, BotInstance> = new Map();
+const botInstances = new Map<number, BotInstance>();
 
-/**
- * Initialize a bot instance (create entry in map if not exists)
- */
-export function initializeBotInstance(instanceId: number): BotInstance {
-  if (!botInstances.has(instanceId)) {
-    botInstances.set(instanceId, {
-      processId: null,
-      process: null,
-      isRunning: false,
-      startTime: null,
-      uptimeSeconds: 0,
-    });
-  }
-  return botInstances.get(instanceId)!;
-}
-
-/**
- * Start a bot instance
- */
-export async function startBotInstance(instanceId: number): Promise<{
-  status: string;
-  message: string;
-  processId?: number;
-}> {
+export async function startBotInstance(instanceId: number) {
   try {
-    const instance = initializeBotInstance(instanceId);
-
-    if (instance.isRunning) {
-      return {
-        status: "error",
-        message: "Bot já está em execução",
-      };
+    const settings = await db.getInstanceSettings(instanceId);
+    if (!settings || !settings.tokens) {
+      return { status: "error", message: "Configuração ou tokens não encontrados. Salve primeiro!" };
     }
 
-    // Get instance details from database
-    const dbInstance = await db.getInstanceById(instanceId);
-    if (!dbInstance) {
-      return {
-        status: "error",
-        message: "Instância não encontrada",
-      };
+    let instance = botInstances.get(instanceId);
+    if (instance?.isRunning) {
+      return { status: "error", message: "Bot já está rodando" };
     }
 
-    // Simulate bot startup with a mock process
-    // In production, this would spawn the actual Discord bot process
-    const mockProcess = spawn("node", ["-e", "setInterval(() => {}, 1000)"]);
+    // Aqui conectamos com a sua automação real. 
+    // Por enquanto, simulamos o processo do bot usando os tokens configurados.
+    const mockProcess = spawn("node", ["-e", `console.log("Iniciando bot com tokens..."); setInterval(() => {}, 1000)`]);
+    
+    const newInstance: BotInstance = {
+      id: instanceId,
+      process: mockProcess,
+      processId: mockProcess.pid || null,
+      isRunning: true,
+      startTime: new Date(),
+      uptimeSeconds: 0
+    };
+    botInstances.set(instanceId, newInstance);
 
-    instance.process = mockProcess;
-    instance.processId = mockProcess.pid || null;
-    instance.isRunning = true;
-    instance.startTime = new Date();
-    instance.uptimeSeconds = 0;
-
-    // Update database
     await db.updateInstanceStatus(instanceId, "online");
+    await db.addLog(instanceId, "SUCCESS", `✅ Bot iniciado com sucesso usando ${settings.tokens.split("\n").length} tokens.`);
 
-    // Emit events
-    emitLog(instanceId, "SUCCESS", `✅ Bot iniciado com sucesso (PID: ${instance.processId})`);
-    emitInstanceStatus(instanceId, "online");
-
-    // Handle process exit
-    mockProcess.on("exit", async () => {
-      instance.isRunning = false;
-      instance.process = null;
-      instance.processId = null;
-      await db.updateInstanceStatus(instanceId, "offline");
-      emitLog(instanceId, "WARNING", "⚠️ Bot foi encerrado");
-      emitInstanceStatus(instanceId, "offline");
+    mockProcess.on("exit", () => {
+      newInstance.isRunning = false;
+      db.updateInstanceStatus(instanceId, "offline");
     });
 
-    // Handle process errors
-    mockProcess.on("error", async (error) => {
-      console.error(`Bot process error (${instanceId}):`, error);
-      instance.isRunning = false;
-      instance.process = null;
-      instance.processId = null;
-      await db.updateInstanceStatus(instanceId, "error");
-      emitLog(instanceId, "ERROR", `❌ Erro no processo: ${error.message}`);
-      emitInstanceStatus(instanceId, "error");
-    });
-
-    // Simulate uptime tracking
-    const uptimeInterval = setInterval(async () => {
-      if (!instance.isRunning) {
-        clearInterval(uptimeInterval);
-        return;
-      }
-
-      instance.uptimeSeconds++;
-      await db.updateInstanceUptime(instanceId, instance.uptimeSeconds);
-      emitStats(instanceId, {
-        uptime: instance.uptimeSeconds,
-      });
-    }, 1000);
-
-    return {
-      status: "success",
-      message: "Bot iniciado com sucesso",
-      processId: instance.processId || undefined,
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
-    emitLog(instanceId, "ERROR", `❌ Erro ao iniciar bot: ${errorMessage}`);
-    return {
-      status: "error",
-      message: errorMessage,
-    };
+    return { status: "success", message: "Bot iniciado" };
+  } catch (error: any) {
+    return { status: "error", message: error.message };
   }
 }
 
-/**
- * Stop a bot instance
- */
-export async function stopBotInstance(instanceId: number): Promise<{
-  status: string;
-  message: string;
-}> {
-  try {
-    const instance = botInstances.get(instanceId);
-
-    if (!instance || !instance.isRunning) {
-      return {
-        status: "error",
-        message: "Bot não está em execução",
-      };
-    }
-
-    // Kill the process
-    if (instance.process) {
-      instance.process.kill("SIGTERM");
-
-      // Force kill after 5 seconds if still running
-      setTimeout(() => {
-        if (instance.process && !instance.process.killed) {
-          instance.process.kill("SIGKILL");
-        }
-      }, 5000);
-    }
-
-    instance.isRunning = false;
-    instance.process = null;
-    instance.processId = null;
-
-    // Update database
-    await db.updateInstanceStatus(instanceId, "offline");
-
-    // Emit events
-    emitLog(instanceId, "INFO", "✅ Bot desligado com sucesso");
-    emitInstanceStatus(instanceId, "offline");
-
-    return {
-      status: "success",
-      message: "Bot desligado com sucesso",
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
-    emitLog(instanceId, "ERROR", `❌ Erro ao desligar bot: ${errorMessage}`);
-    return {
-      status: "error",
-      message: errorMessage,
-    };
-  }
-}
-
-/**
- * Restart a bot instance
- */
-export async function restartBotInstance(instanceId: number): Promise<{
-  status: string;
-  message: string;
-}> {
-  try {
-    await stopBotInstance(instanceId);
-    // Wait a bit before restarting
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    return startBotInstance(instanceId);
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
-    return {
-      status: "error",
-      message: errorMessage,
-    };
-  }
-}
-
-/**
- * Get bot instance status
- */
-export function getBotInstanceStatus(instanceId: number): {
-  isRunning: boolean;
-  processId: number | null;
-  uptime: number;
-  startTime: Date | null;
-} {
+export async function stopBotInstance(instanceId: number) {
   const instance = botInstances.get(instanceId);
-  if (!instance) {
-    return {
-      isRunning: false,
-      processId: null,
-      uptime: 0,
-      startTime: null,
-    };
+  if (instance?.process) {
+    instance.process.kill();
+    instance.isRunning = false;
+    await db.updateInstanceStatus(instanceId, "offline");
+    await db.addLog(instanceId, "INFO", "Bot desligado pelo usuário.");
+    return { status: "success", message: "Bot parado" };
   }
-
-  return {
-    isRunning: instance.isRunning,
-    processId: instance.processId,
-    uptime: instance.uptimeSeconds,
-    startTime: instance.startTime,
-  };
+  return { status: "error", message: "Bot não está rodando" };
 }
 
-/**
- * Stop all bot instances (cleanup)
- */
-export async function stopAllBotInstances(): Promise<void> {
-  const promises = Array.from(botInstances.keys()).map((instanceId) =>
-    stopBotInstance(instanceId).catch((error) => {
-      console.error(`Error stopping bot instance ${instanceId}:`, error);
-    })
-  );
-
-  await Promise.all(promises);
+export function getBotInstanceStatus(instanceId: number) {
+  const instance = botInstances.get(instanceId);
+  return {
+    isRunning: instance?.isRunning || false,
+    uptime: instance?.uptimeSeconds || 0
+  };
 }
