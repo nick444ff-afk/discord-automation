@@ -65,7 +65,7 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-accent mx-auto mb-4" />
           <p className="text-muted-foreground">Carregando...</p>
@@ -76,7 +76,7 @@ export default function Home() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-4xl font-bold mb-4 gradient-text">Discord Bot Manager</h1>
           <p className="text-muted-foreground mb-8 max-w-md">
@@ -91,7 +91,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-950">
       {/* Header */}
       <div className="border-b border-slate-700 bg-card/50 backdrop-blur-sm sticky top-0 z-40">
         <div className="container py-4 flex items-center justify-between">

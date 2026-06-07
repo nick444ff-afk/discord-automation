@@ -6,6 +6,8 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
 import Home from "./pages/Home";
+import Instances from "./pages/Instances";
+import Logs from "./pages/Logs";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -15,6 +17,20 @@ function Router() {
         {() => (
           <DashboardLayout>
             <Home />
+          </DashboardLayout>
+        )}
+      </Route>
+      <Route path={"/instances"}>
+        {() => (
+          <DashboardLayout>
+            <Instances />
+          </DashboardLayout>
+        )}
+      </Route>
+      <Route path={"/logs"}>
+        {() => (
+          <DashboardLayout>
+            <Logs />
           </DashboardLayout>
         )}
       </Route>

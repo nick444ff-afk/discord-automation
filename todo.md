@@ -6,11 +6,11 @@
 - [x] Routers tRPC com procedimentos protegidos para todas as operações
 - [x] Integração Socket.IO para logs em tempo real
 - [x] Módulo socketIO.ts para emissão de eventos
-- [ ] Sistema de gerenciamento de processos de bots (spawn/kill/restart)
-- [ ] Emissão de eventos em tempo real para atualização de estatísticas
+- [x] Sistema de gerenciamento de processos de bots (spawn/kill/restart)
+- [x] Emissão de eventos em tempo real para atualização de estatísticas
 
 ## Frontend
-- [x] Layout DashboardLayout com sidebar navegação
+- [x] Layout DashboardLayout com sidebar navegação (Dashboard, Instâncias, Configurações, Logs)
 - [x] Dashboard principal com cards de estatísticas (Entradas, Filas, Partidas, DMs, Uptime, Bots Online)
 - [x] Página de instâncias com lista de bots e seleção individual
 - [x] Card de instância com status, uptime e botões de ligar/desligar
@@ -19,6 +19,7 @@
 - [x] Tema azul escuro com glassmorphism e animações suaves
 - [x] Design responsivo para mobile e desktop
 - [x] Componentes ShadCN/UI integrados
+- [x] Rotas completas (/, /instances, /logs) integradas
 
 ## Design Visual
 - [x] Paleta de cores azul escuro premium
@@ -29,11 +30,12 @@
 
 ## Testes
 - [x] Vitest para helpers de banco de dados (20 testes passando)
-- [ ] Testes para procedimentos tRPC
-- [ ] Testes de integração Socket.IO
+- [x] Testes para procedimentos tRPC
+- [x] Testes de integração Socket.IO
 
 ## Deploy
-- [ ] Configuração Docker para Railway
-- [ ] Variáveis de ambiente para produção
+- [x] Configuração Docker para Railway
+- [x] Variáveis de ambiente para produção
+- [x] README.md com documentação completa
 - [ ] Build otimizado para produção
 - [ ] Push para GitHub com histórico de commits

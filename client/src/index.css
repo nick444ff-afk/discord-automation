@@ -68,7 +68,9 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    @apply font-sans antialiased;
     font-family: 'Inter', sans-serif;
   }
 
@@ -143,7 +145,7 @@
   }
 
   .btn-premium-secondary {
-    @apply btn-premium bg-card text-foreground border border-border hover:bg-card/80;
+    @apply btn-premium bg-card text-foreground border border-slate-700 hover:bg-card/80;
   }
 
   /* Status indicator with animation */
