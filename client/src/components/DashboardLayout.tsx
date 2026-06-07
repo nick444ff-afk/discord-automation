@@ -19,7 +19,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, PanelLeft, Users, Settings, FileText } from "lucide-react";
+import { LayoutDashboard, PanelLeft, Users, Settings, FileText, Zap } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -29,6 +29,7 @@ const menuItems = [
   { icon: Users, label: "Instâncias", path: "/instances" },
   { icon: Settings, label: "Configurações", path: "/settings" },
   { icon: FileText, label: "Logs", path: "/logs" },
+  { icon: Zap, label: "SystemX", path: "/systemx" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

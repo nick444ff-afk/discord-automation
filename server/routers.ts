@@ -6,6 +6,7 @@ import { z } from "zod";
 import * as db from "./db";
 import { eq } from "drizzle-orm";
 import { getDb } from "./db";
+import * as botManager from "./botManager";
 
 // Usuário padrão para acesso sem autenticação
 const DEFAULT_USER = {
@@ -62,6 +63,22 @@ export const appRouter = router({
     updateUptime: publicProcedure
       .input(z.object({ id: z.number(), uptime: z.number() }))
       .mutation(({ input }) => db.updateInstanceUptime(input.id, input.uptime)),
+    
+    start: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => botManager.startBotInstance(input.id)),
+    
+    stop: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => botManager.stopBotInstance(input.id)),
+    
+    restart: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => botManager.restartBotInstance(input.id)),
+    
+    getStatus: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(({ input }) => botManager.getBotInstanceStatus(input.id)),
   }),
 
   settings: router({

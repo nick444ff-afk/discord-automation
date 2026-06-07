@@ -8,6 +8,7 @@ import DashboardLayout from "./components/DashboardLayout";
 import Home from "./pages/Home";
 import Instances from "./pages/Instances";
 import Logs from "./pages/Logs";
+import SystemX from "./pages/SystemX";
 
 function Router() {
   return (
@@ -30,6 +31,13 @@ function Router() {
         {() => (
           <DashboardLayout>
             <Logs />
+          </DashboardLayout>
+        )}
+      </Route>
+      <Route path="/systemx">
+        {() => (
+          <DashboardLayout>
+            <SystemX />
           </DashboardLayout>
         )}
       </Route>
