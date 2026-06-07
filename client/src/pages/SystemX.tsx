@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 // Estilos injetados para manter o visual original do usuário
@@ -73,122 +72,94 @@ const styles = `
 `;
 
 export default function SystemX() {
-  const [activeBot, setActiveBot] = useState<'BOT 1' | 'BOT 2'>('BOT 1');
+  const [activeBot, setActiveBot] = useState<'BOT1' | 'BOT2'>('BOT1');
   const [tokens, setTokens] = useState('');
   const [rotation, setRotation] = useState(90);
   const [category, setCategory] = useState('Mobile');
-  const [delay, setDelay] = useState(12);
   const [mensagem, setMensagem] = useState('');
-  const [selectedOrgs, setSelectedOrgs] = useState<Record<string, boolean>>({
-    COMPLEXO: true, MORCEGO: true, champions: false, nexus: true, venom: true, yakuza: true
-  });
+  const [isRunning, setIsRunning] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [stats, setStats] = useState({ entries: 0, queues: 0, matches: 0, dms: 0, uptime: '00:00:00' });
 
-  // tRPC Hooks
-  const { data: instances } = trpc.instances.list.useQuery();
-  const currentInstance = instances?.find(i => i.name === activeBot);
-  const instanceId = currentInstance?.id;
-
-  const { data: status } = trpc.instances.getStatus.useQuery(
-    { id: instanceId! },
-    { enabled: !!instanceId, refetchInterval: 3000 }
-  );
-
-  const { data: stats } = trpc.statistics.get.useQuery(
-    { instanceId: instanceId! },
-    { enabled: !!instanceId, refetchInterval: 3000 }
-  );
-
-  const { data: dbLogs } = trpc.logs.list.useQuery(
-    { instanceId: instanceId!, limit: 50 },
-    { enabled: !!instanceId, refetchInterval: 2000 }
-  );
-
-  const { data: settings } = trpc.settings.get.useQuery(
-    { instanceId: instanceId! },
-    { enabled: !!instanceId }
-  );
-
-  const startMutation = trpc.instances.start.useMutation();
-  const stopMutation = trpc.instances.stop.useMutation();
-  const saveSettingsMutation = trpc.settings.save.useMutation();
-  const clearLogsMutation = trpc.logs.clear.useMutation();
-  const resetStatsMutation = trpc.statistics.update.useMutation();
-
-  // Carregar configurações do banco
+  // Buscar configurações ao carregar
   useEffect(() => {
-    if (settings) {
-      setTokens(settings.tokens || '');
-      setRotation(settings.rotationMinutes || 90);
-      setCategory(settings.category || 'Mobile');
-      setDelay(settings.delaySeconds || 12);
-      setMensagem(settings.mainMessage || '');
-      
-      try {
-        const orgs = JSON.parse(settings.organizations || '{}');
-        if (Object.keys(orgs).length > 0) setSelectedOrgs(orgs);
-      } catch (e) {}
-    }
-  }, [settings]);
+    fetch(`/api/bot/config/${activeBot}`)
+      .then(res => res.json())
+      .then(data => {
+        setTokens(data.tokens || '');
+        setRotation(data.rotation || 90);
+        setCategory(data.category || 'Mobile');
+        setMensagem(data.mensagem || '');
+      })
+      .catch(() => {});
+  }, [activeBot]);
+
+  // Loop de atualização de Status e Logs
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Status
+      fetch(`/api/bot/status/${activeBot}`)
+        .then(res => res.json())
+        .then(data => {
+          setIsRunning(data.isRunning);
+          if (data.stats) setStats(data.stats);
+        })
+        .catch(() => {});
+
+      // Logs
+      fetch(`/api/bot/logs/${activeBot}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setLogs(data);
+        })
+        .catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [activeBot]);
 
   const toggleBot = async () => {
-    if (!instanceId) return;
+    const endpoint = isRunning ? 'stop' : 'start';
     try {
-      if (status?.isRunning) {
-        await stopMutation.mutateAsync({ id: instanceId });
-        toast.success(`${activeBot} parado!`);
+      const res = await fetch(`/api/bot/${endpoint}/${activeBot}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setIsRunning(!isRunning);
+        toast.success(data.message);
       } else {
-        await startMutation.mutateAsync({ id: instanceId });
-        toast.success(`${activeBot} iniciado!`);
+        toast.error(data.message);
       }
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao controlar bot");
+    } catch (e) {
+      toast.error("Erro ao comunicar com o servidor");
     }
   };
 
   const salvarConfiguracao = async () => {
-    if (!instanceId) return;
     try {
-      await saveSettingsMutation.mutateAsync({
-        instanceId,
-        tokens,
-        tokenRotation: true,
-        messageDelay: delay,
-        mainMessage: mensagem,
-        secondaryMessage: "",
-        categoryName: category,
-        organizations: JSON.stringify(selectedOrgs),
-        queueMode: "2x2"
+      const res = await fetch(`/api/bot/config/${activeBot}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tokens, rotation, category, mensagem })
       });
-      toast.success("Configuração salva com sucesso!");
-    } catch (error: any) {
-      toast.error("Erro ao salvar configuração");
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Configuração salva!");
+      } else {
+        toast.error("Erro ao salvar");
+      }
+    } catch (e) {
+      toast.error("Erro ao salvar");
     }
   };
 
   const resetStats = async () => {
-    if (!instanceId) return;
-    await resetStatsMutation.mutateAsync({
-      instanceId,
-      entries: 0,
-      activeQueues: 0,
-      matchesFound: 0,
-      dmsSent: 0,
-      uptime: 0
-    });
+    await fetch(`/api/bot/reset/${activeBot}`, { method: 'POST' });
     toast.success("Estatísticas resetadas!");
   };
 
   const limparLogs = async () => {
-    if (!instanceId) return;
-    await clearLogsMutation.mutateAsync({ instanceId });
+    await fetch(`/api/bot/logs/${activeBot}`, { method: 'DELETE' });
+    setLogs([]);
     toast.success("Logs limpos!");
-  };
-
-  const formatUptime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
   };
 
   return (
@@ -203,44 +174,44 @@ export default function SystemX() {
           <h1 className="systemx-title">SystemX</h1>
           <p className="systemx-subtitle">PAINEL DE CONTROLE</p>
           <div className="systemx-status">
-            <div className={`systemx-badge ${instanceId ? 'systemx-badge-green' : 'systemx-badge-red'}`}>
-              {instanceId ? 'Conectado' : 'Desconectado'}
+            <div className={`systemx-badge systemx-badge-green`}>
+              Conectado
             </div>
-            <div className={`systemx-badge ${status?.isRunning ? 'systemx-badge-green' : 'systemx-badge-red'}`}>
-              {status?.isRunning ? 'Rodando' : 'Parado'}
+            <div className={`systemx-badge ${isRunning ? 'systemx-badge-green' : 'systemx-badge-red'}`}>
+              {isRunning ? 'Rodando' : 'Parado'}
             </div>
           </div>
           <div className="systemx-bot-tabs">
-            <div className={activeBot === 'BOT 1' ? 'active' : ''} onClick={() => setActiveBot('BOT 1')}>BOT1</div>
-            <div className={activeBot === 'BOT 2' ? 'active' : ''} onClick={() => setActiveBot('BOT 2')}>BOT2</div>
+            <div className={activeBot === 'BOT1' ? 'active' : ''} onClick={() => setActiveBot('BOT1')}>BOT1</div>
+            <div className={activeBot === 'BOT2' ? 'active' : ''} onClick={() => setActiveBot('BOT2')}>BOT2</div>
           </div>
           <p className="systemx-subtitle" style={{marginTop: '15px'}}>INSTÂNCIA ATIVA: {activeBot}</p>
         </div>
 
         {/* CONTROLE */}
-        <div className={`systemx-card ${status?.isRunning ? 'bot-ligado' : ''}`}>
+        <div className={`systemx-card ${isRunning ? 'bot-ligado' : ''}`}>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <h3 style={{margin: 0}}>Controle - {activeBot}</h3>
             <span style={{fontSize: '12px', padding: '4px 12px', borderRadius: '20px', background: 'rgba(34,211,238,0.12)', color: '#22d3ee'}}>{activeBot}</span>
           </div>
           <div className="systemx-play-wrapper">
-            <div className={`systemx-play ${status?.isRunning ? 'ligado' : ''}`} onClick={toggleBot}>
+            <div id="playButton" className={`systemx-play ${isRunning ? 'ligado' : ''}`} onClick={toggleBot}>
               <div className="icon-play"></div>
               <div className="icon-stop"></div>
             </div>
-            <p className="systemx-subtitle" style={{color: status?.isRunning ? '#f87171' : '', fontWeight: status?.isRunning ? 'bold' : 'normal'}}>
-              {status?.isRunning ? `${activeBot} em execução...` : 'Clique para iniciar o bot'}
+            <p className="systemx-subtitle" style={{color: isRunning ? '#f87171' : '', fontWeight: isRunning ? 'bold' : 'normal'}}>
+              {isRunning ? `${activeBot} em execução...` : 'Clique para iniciar o bot'}
             </p>
           </div>
         </div>
 
         {/* STATS */}
         {[
-          { label: 'Entradas', value: stats?.entries || 0, color: '' },
-          { label: 'Na Fila', value: stats?.queues || 0, color: '#22c55e' },
-          { label: 'Partidas', value: stats?.matches || 0, color: '#a855f7' },
-          { label: 'DMs', value: stats?.dms || 0, color: '#06b6d4' },
-          { label: 'Uptime', value: formatUptime(stats?.uptime || 0), color: '#facc15' }
+          { label: 'Entradas', value: stats.entries, color: '' },
+          { label: 'Na Fila', value: stats.queues, color: '#22c55e' },
+          { label: 'Partidas', value: stats.matches, color: '#a855f7' },
+          { label: 'DMs', value: stats.dms, color: '#06b6d4' },
+          { label: 'Uptime', value: stats.uptime, color: '#facc15' }
         ].map((s, i) => (
           <div key={i} className="systemx-card systemx-stat">
             <div className="systemx-stat-title">{s.label}</div>
@@ -256,36 +227,33 @@ export default function SystemX() {
         <div className="systemx-card">
           <h3>Configuração</h3>
           <label style={{display: 'block', marginTop: '15px'}}>Tokens</label>
-          <textarea className="systemx-textarea" rows={3} value={tokens} onChange={(e) => setTokens(e.target.value)} placeholder="Cole seus tokens aqui (um por linha)"></textarea>
+          <textarea id="tokens" className="systemx-textarea" rows={3} value={tokens} onChange={(e) => setTokens(e.target.value)} placeholder="Cole seus tokens aqui (um por linha)"></textarea>
           
           <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px'}}>
             <div>
               <label style={{display: 'block', marginTop: '15px'}}>Rotação</label>
-              <input type="number" className="systemx-input" value={rotation} onChange={(e) => setRotation(Number(e.target.value))} />
+              <input id="rotation" type="number" className="systemx-input" value={rotation} onChange={(e) => setRotation(Number(e.target.value))} />
             </div>
             <div>
-              <label style={{display: 'block', marginTop: '15px'}}>Delay</label>
-              <input type="number" className="systemx-input" value={delay} onChange={(e) => setDelay(Number(e.target.value))} />
+              <label style={{display: 'block', marginTop: '15px'}}>Categoria</label>
+              <select id="category" className="systemx-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+                <option>Mobile</option>
+                <option>Desktop</option>
+              </select>
             </div>
           </div>
 
-          <label style={{display: 'block', marginTop: '15px'}}>Categoria</label>
-          <select className="systemx-select" value={category} onChange={(e) => setCategory(e.target.value)}>
-            <option>Mobile</option>
-            <option>Desktop</option>
-          </select>
-
           <label style={{display: 'block', marginTop: '15px'}}>Mensagem</label>
-          <input type="text" className="systemx-input" value={mensagem} onChange={(e) => setMensagem(e.target.value)} placeholder="Digite a mensagem" />
+          <input id="mensagem" type="text" className="systemx-input" value={mensagem} onChange={(e) => setMensagem(e.target.value)} placeholder="Digite a mensagem" />
 
-          <button className="systemx-save-btn" onClick={salvarConfiguracao}>SALVAR CONFIGURAÇÃO</button>
+          <button id="saveBtnConfig" className="systemx-save-btn" onClick={salvarConfiguracao}>SALVAR CONFIGURAÇÃO</button>
         </div>
 
         {/* LOGS */}
         <div className="systemx-card">
           <h3>Logs</h3>
           <div className="systemx-logs">
-            {dbLogs?.map((log, i) => (
+            {logs.map((log, i) => (
               <div key={i} style={{color: log.level === 'ERROR' ? '#f87171' : log.level === 'SUCCESS' ? '#22c55e' : '#22d3ee'}}>
                 <span style={{color: '#4b5563'}}>[{new Date(log.createdAt).toLocaleTimeString()}]</span> {log.message}
               </div>
