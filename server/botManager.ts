@@ -10,9 +10,10 @@ interface BotInstance {
   interval: NodeJS.Timeout | null;
 }
 
+// Armazenamento das instâncias de forma totalmente isolada
 const botInstances = new Map<number, BotInstance>();
 
-// Memória temporária para logs e status (VELOCIDADE MÁXIMA)
+// Memória temporária para logs e status totalmente independente por ID
 export const memoryLogs = new Map<number, any[]>();
 export const memoryStatus = new Map<number, boolean>();
 
@@ -26,13 +27,16 @@ function addMemoryLog(instanceId: number, level: string, message: string) {
     memoryLogs.set(instanceId, logs.slice(0, 50));
 }
 
-export async function startBotInstance(instanceId: number, botName: string = "BOT1") {
+export async function startBotInstance(instanceId: number, botName: string) {
   try {
-    // Feedback imediato
+    // Resetar status de erro anterior e dar feedback imediato
     memoryStatus.set(instanceId, true);
-    addMemoryLog(instanceId, "INFO", "Iniciando login do token...");
+    addMemoryLog(instanceId, "INFO", `Iniciando ${botName}...`);
 
+    // Tentar pegar configurações locais (BOT1 ou BOT2)
     let settings = await getSettings(botName);
+    
+    // Se não tiver local, tenta no banco apenas para essa instância
     if (!settings) {
         try {
             const dbSettings = await db.getInstanceSettings(instanceId);
@@ -48,22 +52,25 @@ export async function startBotInstance(instanceId: number, botName: string = "BO
         } catch (e) {}
     }
 
-    if (!settings || !settings.tokens) {
+    if (!settings || !settings.tokens || settings.tokens.trim() === "") {
       memoryStatus.set(instanceId, false);
+      addMemoryLog(instanceId, "ERROR", "Nenhum token configurado para este bot.");
       return { status: "error", message: "Token não encontrado." };
     }
 
-    // PEGAR APENAS O PRIMEIRO TOKEN (Limitação de 1 token por instância)
+    // Pegar apenas o primeiro token da lista desta instância
     const token = settings.tokens.split(/[\n,]+/)[0]?.trim();
 
     if (!token) {
       memoryStatus.set(instanceId, false);
+      addMemoryLog(instanceId, "ERROR", "Token inválido.");
       return { status: "error", message: "Token inválido." };
     }
 
-    let instance = botInstances.get(instanceId);
-    if (instance?.isRunning) {
-      return { status: "error", message: "Bot já está rodando" };
+    // Verificar se já existe uma instância rodando PARA ESTE ID e parar se necessário
+    let existingInstance = botInstances.get(instanceId);
+    if (existingInstance?.isRunning) {
+        return { status: "error", message: "Este bot já está rodando." };
     }
 
     const client = new Client({ checkUpdate: false });
@@ -90,24 +97,25 @@ export async function startBotInstance(instanceId: number, botName: string = "BO
           interval: interval
         });
 
+        memoryStatus.set(instanceId, true);
         db.updateInstanceStatus(instanceId, "online").catch(() => {});
-        resolve({ status: "success", message: `Bot iniciado como @${client.user?.username}` });
+        resolve({ status: "success", message: `Bot iniciado com sucesso!` });
       });
 
       client.login(token).catch((err) => {
-        const errorMsg = `✕ Falha no login: ${err.message}`;
+        const errorMsg = `✕ Erro: ${err.message}`;
         addMemoryLog(instanceId, "ERROR", errorMsg);
         memoryStatus.set(instanceId, false);
         resolve({ status: "error", message: err.message });
       });
 
-      // Timeout de segurança
+      // Timeout independente
       setTimeout(() => {
           if (!botInstances.has(instanceId)) {
               memoryStatus.set(instanceId, false);
               resolve({ status: "error", message: "Tempo de login excedido" });
           }
-      }, 20000);
+      }, 30000);
     });
 
   } catch (error: any) {
@@ -132,8 +140,10 @@ export async function stopBotInstance(instanceId: number) {
 }
 
 export function getBotInstanceStatus(instanceId: number) {
+  const isRunning = memoryStatus.get(instanceId) || false;
+  const instance = botInstances.get(instanceId);
   return {
-    isRunning: memoryStatus.get(instanceId) || false,
-    uptime: botInstances.get(instanceId)?.uptimeSeconds || 0
+    isRunning: isRunning,
+    uptime: instance?.uptimeSeconds || 0
   };
 }
