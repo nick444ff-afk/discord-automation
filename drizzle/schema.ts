@@ -1,8 +1,8 @@
 import { integer, text, timestamp, varchar, pgTable, pgEnum } from "drizzle-orm/pg-core";
 
-export const user_roleEnum = pgEnum("user_role", ['user', 'admin']);
-export const instance_statusEnum = pgEnum("instance_status", ['online', 'offline', 'error']);
-export const log_levelEnum = pgEnum("log_level", ['INFO', 'SUCCESS', 'WARNING', 'ERROR']);
+export const userRoleEnum = pgEnum("user_role", ['user', 'admin']);
+export const instanceStatusEnum = pgEnum("instance_status", ['online', 'offline', 'error']);
+export const logLevelEnum = pgEnum("log_level", ['INFO', 'SUCCESS', 'WARNING', 'ERROR']);
 
 /**
  * Core user table backing auth flow.
