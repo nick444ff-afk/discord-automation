@@ -26,22 +26,19 @@ export function registerBotApi(app: express.Express) {
       const instanceId = botName === "BOT1" ? 1 : 2;
       const status = botManager.getBotInstanceStatus(instanceId);
       
-      let stats = null;
+      let stats = { entries:0, queues:0, matches:0, dms:0, uptime: "00:00:00" };
       try {
-        stats = await db.getStatistics(instanceId);
+        const dbStats = await db.getStatistics(instanceId);
+        if (dbStats) {
+            const h = Math.floor(dbStats.uptime / 3600);
+            const m = Math.floor((dbStats.uptime % 3600) / 60);
+            const s = dbStats.uptime % 60;
+            const uptimeStr = [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+            stats = { ...dbStats, uptime: uptimeStr };
+        }
       } catch (e) {}
       
-      const formatUptime = (seconds: number) => {
-          const h = Math.floor(seconds / 3600);
-          const m = Math.floor((seconds % 3600) / 60);
-          const s = seconds % 60;
-          return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
-      };
-
-      res.json({
-        isRunning: status.isRunning,
-        stats: stats ? { ...stats, uptime: formatUptime(stats.uptime) } : { entries:0, queues:0, matches:0, dms:0, uptime: formatUptime(status.uptime) }
-      });
+      res.json({ isRunning: status.isRunning, stats });
     } catch (e) {
       res.json({ isRunning: false, stats: { entries:0, queues:0, matches:0, dms:0, uptime: "00:00:00" } });
     }
@@ -83,18 +80,18 @@ export function registerBotApi(app: express.Express) {
     try {
       await saveSettings(botName, settings);
       
+      // LOG DE SALVAMENTO IMEDIATO
+      const logMsg = "✓ CONFIGURAÇÃO SALVA!";
+      const logs = botManager.memoryLogs.get(instanceId) || [];
+      logs.unshift({ level: "SUCCESS", message: logMsg, createdAt: new Date().toISOString() });
+      botManager.memoryLogs.set(instanceId, logs.slice(0, 50));
+      
       // Sincronizar banco em background
+      db.addLog(instanceId, "SUCCESS", logMsg).catch(() => {});
       db.getUserInstances(DEFAULT_USER.id).then(async (instances) => {
         let instance = instances.find(i => i.name.replace(/\s+/g, "") === botName);
-        if (!instance) {
-          instance = await db.createInstance(DEFAULT_USER.id, botName === "BOT1" ? "BOT 1" : "BOT 2");
-        }
-        if (instance) {
-          await db.createOrUpdateInstanceSettings(instance.id, {
-            instanceId: instance.id,
-            ...settings
-          });
-        }
+        if (!instance) instance = await db.createInstance(DEFAULT_USER.id, botName === "BOT1" ? "BOT 1" : "BOT 2");
+        if (instance) await db.createOrUpdateInstanceSettings(instance.id, { instanceId: instance.id, ...settings });
       }).catch(() => {});
 
       res.json({ success: true, message: "Configuração salva!" });
@@ -108,8 +105,9 @@ export function registerBotApi(app: express.Express) {
     try {
       const botName = req.params.name;
       const instanceId = botName === "BOT1" ? 1 : 2;
-      const result = await botManager.startBotInstance(instanceId, botName);
-      res.json({ success: result.status === "success", message: result.message });
+      // Iniciar de forma assíncrona para não travar a requisição HTTP
+      botManager.startBotInstance(instanceId, botName).catch(console.error);
+      res.json({ success: true, message: "Iniciando..." });
     } catch (e: any) {
       res.json({ success: false, message: e.message });
     }
@@ -132,20 +130,8 @@ export function registerBotApi(app: express.Express) {
     try {
       const botName = req.params.name;
       const instanceId = botName === "BOT1" ? 1 : 2;
-      
-      let logs: any[] = [];
-      try {
-        const dbLogs = await db.getInstanceLogs(instanceId, 50);
-        const mLogs = botManager.memoryLogs.get(instanceId) || [];
-        // Combinar logs do banco e da memória, remover duplicados por mensagem e data
-        logs = [...mLogs, ...dbLogs].sort((a, b) => 
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        ).slice(0, 50);
-      } catch (e) {
-        logs = botManager.memoryLogs.get(instanceId) || [];
-      }
-      
-      res.json(logs);
+      const mLogs = botManager.memoryLogs.get(instanceId) || [];
+      res.json(mLogs);
     } catch (e) {
       res.json([]);
     }
