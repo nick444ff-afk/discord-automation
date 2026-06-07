@@ -1,26 +1,268 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SystemX - Final</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Segoe UI', sans-serif; background: linear-gradient(180deg, #050c1f, #0b1f47); color: #e5e7eb; min-height: 100vh; }
+.container { max-width: 500px; margin: auto; padding: 15px; }
+.card { background: linear-gradient(145deg, #0b1f47, #08142e); border-radius: 22px; padding: 20px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 40px rgba(0,0,0,0.5); transition: border-color 0.4s ease, box-shadow 0.4s ease; }
+.card.bot-ligado { border-color: rgba(239, 68, 68, 0.45); box-shadow: 0 10px 40px rgba(239,68,68,0.25), inset 0 0 40px rgba(0,0,0,0.5); }
+.header { text-align: center; }
+.logo { width: 80px; height: 80px; margin: 0 auto 20px; border-radius: 22px; background: linear-gradient(145deg, #1e3a8a, #1d4ed8); display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 0 25px rgba(59,130,246,0.4); }
+.logo img { width: 100%; height: 100%; object-fit: cover; }
+.title { font-size: 26px; font-weight: 700; letter-spacing: 4px; }
+.subtitle { opacity: 0.6; font-size: 13px; margin-top: 5px; }
+.status { display: flex; justify-content: center; gap: 10px; margin-top: 15px; }
+.badge { padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; transition: all 0.3s ease; }
+.badge-green { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
+.badge-red { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+.badge-yellow { background: rgba(250,204,21,0.15); color: #facc15; border: 1px solid rgba(250,204,21,0.3); }
+.bot-tabs { display: flex; background: #091a36; border-radius: 30px; padding: 6px; margin-top: 15px; }
+.bot-tabs div { flex: 1; text-align: center; padding: 10px; border-radius: 20px; cursor: pointer; transition: all 0.3s ease; font-weight: 600; user-select: none; }
+.bot-tabs div:hover:not(.active) { background: rgba(255,255,255,0.07); }
+.bot-tabs .active { background: #e5e7eb; color: #000; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+.play-wrapper { display: flex; flex-direction: column; align-items: center; margin: 30px 0 10px; }
+.play { width: 140px; height: 140px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.35s ease; position: relative; background: rgba(255,255,255,0.03); user-select: none; }
+.play:hover { transform: scale(1.06); box-shadow: 0 0 30px rgba(255,255,255,0.2); }
+.play .icon-play { width: 0; height: 0; border-left: 32px solid #fff; border-top: 20px solid transparent; border-bottom: 20px solid transparent; margin-left: 8px; }
+.play .icon-stop { width: 26px; height: 26px; background: #ef4444; border-radius: 4px; display: none; animation: blink 1.2s infinite; }
+.play.ligado { border-color: #ef4444; box-shadow: 0 0 35px rgba(239,68,68,0.5); background: rgba(239,68,68,0.08); }
+.play.ligado .icon-play { display: none; }
+.play.ligado .icon-stop { display: block; }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.play-label { margin-top: 14px; font-size: 13px; opacity: 0.65; text-align: center; transition: color 0.3s; letter-spacing: 0.5px; }
+.play-label.ligado { color: #f87171; opacity: 1; font-weight: 600; }
+.card.stat { padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; }
+.stat-title { font-size: 14px; opacity: 0.65; font-weight: 500; }
+.stat-value { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+.green-text { color: #22c55e; }
+.purple-text { color: #a855f7; }
+.cyan-text { color: #06b6d4; }
+.yellow-text { color: #facc15; }
+.reset-btn { width: 100%; padding: 14px; border-radius: 14px; border: 1px solid rgba(255, 80, 80, 0.4); background: rgba(255, 80, 80, 0.08); color: #ff5a5a; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.25s ease; backdrop-filter: blur(6px); }
+input, textarea, select { width: 100%; padding: 14px; margin-top: 6px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.07); background: #020617; color: #fff; font-size: 14px; outline: none; }
+.orgs-box { background: #020617; border-radius: 14px; padding: 10px 15px; max-height: 180px; overflow-y: auto; margin-top: 8px; border: 1px solid rgba(255,255,255,0.06); }
+.org-item { display: flex; align-items: center; gap: 12px; padding: 9px 5px; cursor: pointer; font-size: 15px; }
+.save-btn { width: 100%; padding: 15px; margin-top: 20px; border: none; border-radius: 12px; background: linear-gradient(135deg, #1d4ed8, #2563eb); color: #fff; font-weight: 700; font-size: 15px; cursor: pointer; box-shadow: 0 4px 15px rgba(29,78,216,0.35); }
+.logs { background: #000; padding: 15px; border-radius: 12px; font-family: 'Courier New', monospace; font-size: 13px; height: 200px; overflow-y: auto; line-height: 1.6; border: 1px solid rgba(255,255,255,0.05); }
+.clear-logs-btn { margin-top: 12px; width: 100%; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,90,90,0.35); background: rgba(255,90,90,0.1); color: #ff5a5a; font-weight: 700; cursor: pointer; }
+.toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1d4ed8; color: #fff; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: 600; box-shadow: 0 8px 25px rgba(0,0,0,0.5); z-index: 9999; transition: all 0.35s ease; opacity: 0; white-space: nowrap; }
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+.toast.success { background: #16a34a; }
+.toast.error { background: #dc2626; }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="card header">
+        <div class="logo"><img src="https://i.imgur.com/llnJtbZ.png" alt="Logo"></div>
+        <h1 class="title">SystemX</h1>
+        <p class="subtitle">PAINEL DE CONTROLE</p>
+        <div class="status">
+            <div class="badge badge-red" id="badgeConexao">Desconectado</div>
+            <div class="badge badge-red" id="badgeStatus">Parado</div>
+        </div>
+        <div class="bot-tabs" id="botTabs">
+            <div class="active" data-bot="BOT1" onclick="mudarBot(this)">BOT1</div>
+            <div data-bot="BOT2" onclick="mudarBot(this)">BOT2</div>
+        </div>
+        <p class="instancia-text" id="instancia">INSTÂNCIA ATIVA: BOT1</p>
+    </div>
 
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>Discord Bot Manager SaaS</title>    
-    <!-- THIS IS THE START OF A COMMENT BLOCK, BLOCK TO BE DELETED: Google Fonts here, example:
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    THIS IS THE END OF A COMMENT BLOCK, BLOCK TO BE DELETED -->
-  </head>
+    <div class="card" id="cardControle">
+        <div class="controle-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <h3 id="controleTitle">Controle - Bot 1</h3>
+            <span class="bot-indicator badge-yellow" id="botIndicator" style="padding:4px 10px; border-radius:10px; font-size:12px;">BOT1</span>
+        </div>
+        <div class="play-wrapper">
+            <div class="play" id="playButton" onclick="toggleBot()">
+                <div class="icon-play"></div>
+                <div class="icon-stop"></div>
+            </div>
+            <p class="play-label" id="playLabel">Clique para iniciar o bot</p>
+        </div>
+    </div>
 
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-    <script
-      defer
-      src="%VITE_ANALYTICS_ENDPOINT%/umami"
-      data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
-  </body>
+    <div class="card stat"><div class="stat-title">Entradas</div><div class="stat-value" id="entradas">0</div></div>
+    <div class="card stat"><div class="stat-title">Na Fila</div><div class="stat-value green-text" id="naFila">0</div></div>
+    <div class="card stat"><div class="stat-title">Partidas</div><div class="stat-value purple-text" id="partidas">0</div></div>
+    <div class="card stat"><div class="stat-title">DMs</div><div class="stat-value cyan-text" id="dms">0</div></div>
+    <div class="card stat"><div class="stat-title">Uptime</div><div class="stat-value yellow-text" id="uptime">00:00:00</div></div>
 
+    <div class="reset-container"><button class="reset-btn" onclick="resetStats()">RESETAR STATS</button></div>
+
+    <div class="card">
+        <h3>Configuração</h3>
+        <label>Tokens</label>
+        <textarea id="tokens" rows="3" placeholder="Cole seus tokens aqui (um por linha)"></textarea>
+        <label>Rotação</label>
+        <input type="number" id="rotation" value="90">
+        <label>Categoria</label>
+        <select id="category"><option>Mobile</option><option>Desktop</option></select>
+        <label>Mensagem</label>
+        <input type="text" id="mensagem" placeholder="Digite a mensagem">
+        <button class="save-btn" id="saveBtnConfig" onclick="salvarConfiguracao()">SALVAR CONFIGURAÇÃO</button>
+    </div>
+
+    <div class="card">
+        <h3>Logs</h3>
+        <div class="logs" id="logs"></div>
+        <button class="clear-logs-btn" onclick="limparLogs()">Limpar Logs</button>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API_URL = '/api/bot';
+let botAtivo = 'BOT1';
+let botLigado = false;
+let configSalva = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+    carregarConfiguracao();
+    setInterval(atualizarStatus, 2000);
+    setInterval(fetchLogs, 1000);
+});
+
+function showToast(msg, type='info') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast show ${type}`;
+    setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function addLog(msg, type='info') {
+    const l = document.getElementById('logs');
+    const div = document.createElement('div');
+    div.className = `log-entry log-${type}`;
+    div.innerHTML = `<span class="log-time">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
+    l.prepend(div);
+}
+
+async function carregarConfiguracao() {
+    try {
+        const r = await fetch(`${API_URL}/config/${botAtivo}`);
+        if (r.ok) {
+            const d = await r.json();
+            document.getElementById('tokens').value = d.tokens || '';
+            document.getElementById('rotation').value = d.rotation || 90;
+            document.getElementById('category').value = d.category || 'Mobile';
+            document.getElementById('mensagem').value = d.mensagem || '';
+            configSalva = !!d.tokens;
+        }
+    } catch (e) {}
+}
+
+async function salvarConfiguracao() {
+    const tokens = document.getElementById('tokens').value.trim();
+    if (!tokens) return showToast('Insira pelo menos um token!', 'error');
+    
+    const data = {
+        tokens,
+        rotation: document.getElementById('rotation').value,
+        category: document.getElementById('category').value,
+        mensagem: document.getElementById('mensagem').value
+    };
+
+    try {
+        const r = await fetch(`${API_URL}/config/${botAtivo}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (r.ok) {
+            configSalva = true;
+            showToast('Configuração salva!', 'success');
+            addLog('Configurações atualizadas.', 'success');
+        }
+    } catch (e) { showToast('Erro ao salvar!', 'error'); }
+}
+
+async function toggleBot() {
+    const tokens = document.getElementById('tokens').value.trim();
+    if (!tokens || !configSalva) return showToast('Salve as configurações com tokens primeiro!', 'error');
+
+    const action = botLigado ? 'stop' : 'start';
+    try {
+        const r = await fetch(`${API_URL}/${action}/${botAtivo}`, { method: 'POST' });
+        const d = await r.json();
+        if (d.success) {
+            botLigado = !botLigado;
+            showToast(botLigado ? 'Bot Iniciado!' : 'Bot Parado!', 'success');
+        } else { showToast(d.message, 'error'); }
+    } catch (e) { showToast('Erro na conexão!', 'error'); }
+}
+
+async function atualizarStatus() {
+    try {
+        const r = await fetch(`${API_URL}/status/${botAtivo}`);
+        const d = await r.json();
+        botLigado = d.isRunning;
+        document.getElementById('badgeStatus').textContent = botLigado ? 'Rodando' : 'Parado';
+        document.getElementById('badgeStatus').className = `badge ${botLigado ? 'badge-green' : 'badge-red'}`;
+        document.getElementById('badgeConexao').textContent = 'Conectado';
+        document.getElementById('badgeConexao').className = 'badge badge-green';
+        document.getElementById('playButton').className = `play ${botLigado ? 'ligado' : ''}`;
+        document.getElementById('cardControle').className = `card ${botLigado ? 'bot-ligado' : ''}`;
+        
+        if (d.stats) {
+            document.getElementById('entradas').textContent = d.stats.entries || 0;
+            document.getElementById('naFila').textContent = d.stats.queues || 0;
+            document.getElementById('partidas').textContent = d.stats.matches || 0;
+            document.getElementById('dms').textContent = d.stats.dms || 0;
+            document.getElementById('uptime').textContent = d.stats.uptime || '00:00:00';
+        }
+    } catch (e) {
+        document.getElementById('badgeConexao').textContent = 'Desconectado';
+        document.getElementById('badgeConexao').className = 'badge badge-red';
+    }
+}
+
+async function fetchLogs() {
+    try {
+        const r = await fetch(`${API_URL}/logs/${botAtivo}`);
+        const d = await r.json();
+        const l = document.getElementById('logs');
+        l.innerHTML = '';
+        d.forEach(log => {
+            const div = document.createElement('div');
+            div.className = `log-entry log-${log.level.toLowerCase()}`;
+            div.innerHTML = `<span class="log-time">[${new Date(log.createdAt).toLocaleTimeString()}]</span> ${log.message}`;
+            l.appendChild(div);
+        });
+    } catch (e) {}
+}
+
+function mudarBot(el) {
+    if (el.getAttribute('data-bot') === botAtivo) return;
+    document.querySelectorAll('.bot-tabs div').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    botAtivo = el.getAttribute('data-bot');
+    document.getElementById('instancia').textContent = `INSTÂNCIA ATIVA: ${botAtivo}`;
+    document.getElementById('controleTitle').textContent = `Controle - ${botAtivo}`;
+    document.getElementById('botIndicator').textContent = botAtivo;
+    carregarConfiguracao();
+    showToast(`Trocado para ${botAtivo}`);
+}
+
+async function resetStats() {
+    try {
+        await fetch(`${API_URL}/reset/${botAtivo}`, { method: 'POST' });
+        showToast('Estatísticas resetadas!');
+    } catch (e) {}
+}
+
+async function limparLogs() {
+    try {
+        await fetch(`${API_URL}/logs/${botAtivo}`, { method: 'DELETE' });
+        document.getElementById('logs').innerHTML = '';
+        showToast('Logs limpos!');
+    } catch (e) {}
+}
+</script>
+</body>
 </html>

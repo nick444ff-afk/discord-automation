@@ -1,152 +1,113 @@
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
+import { publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
-import { eq } from "drizzle-orm";
-import { getDb } from "./db";
 import * as botManager from "./botManager";
+import express from "express";
 
-// Usuário padrão para acesso sem autenticação
-const DEFAULT_USER = {
-  id: 1,
-  openId: "default-user",
-  name: process.env.OWNER_NAME || "Admin",
-  email: "admin@discord-bot.local",
-  loginMethod: "local",
-  role: "admin" as const,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  lastSignedIn: new Date(),
-};
+// Usuário padrão
+const DEFAULT_USER = { id: 1, name: "Admin" };
 
 export const appRouter = router({
   system: systemRouter,
-  
-  auth: router({
-    me: publicProcedure.query(() => DEFAULT_USER),
-    
-    logout: publicProcedure.mutation(() => {
-      return {
-        success: true,
-      } as const;
-    }),
-  }),
-
-  instances: router({
-    list: publicProcedure.query(async () => {
-      const instances = await db.getUserInstances(DEFAULT_USER.id);
-      
-      // Se não houver instâncias, criar padrão
-      if (instances.length === 0) {
-        const bot1 = await db.createInstance(DEFAULT_USER.id, "BOT 1");
-        const bot2 = await db.createInstance(DEFAULT_USER.id, "BOT 2");
-        return [bot1, bot2];
-      }
-      
-      return instances;
-    }),
-    
-    create: publicProcedure
-      .input(z.object({ name: z.string().min(1) }))
-      .mutation(({ input }) => db.createInstance(DEFAULT_USER.id, input.name)),
-    
-    getById: publicProcedure
-      .input(z.object({ id: z.number() }))
-      .query(({ input }) => db.getInstanceById(input.id)),
-    
-    updateStatus: publicProcedure
-      .input(z.object({ id: z.number(), status: z.enum(["online", "offline", "error"]) }))
-      .mutation(({ input }) => db.updateInstanceStatus(input.id, input.status)),
-    
-    updateUptime: publicProcedure
-      .input(z.object({ id: z.number(), uptime: z.number() }))
-      .mutation(({ input }) => db.updateInstanceUptime(input.id, input.uptime)),
-    
-    start: publicProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(({ input }) => botManager.startBotInstance(input.id)),
-    
-    stop: publicProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(({ input }) => botManager.stopBotInstance(input.id)),
-    
-    restart: publicProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(({ input }) => botManager.restartBotInstance(input.id)),
-    
-    getStatus: publicProcedure
-      .input(z.object({ id: z.number() }))
-      .query(({ input }) => botManager.getBotInstanceStatus(input.id)),
-  }),
-
-  settings: router({
-    get: publicProcedure
-      .input(z.object({ instanceId: z.number() }))
-      .query(({ input }) => db.getInstanceSettings(input.instanceId)),
-    
-    save: publicProcedure
-      .input(z.object({
-        instanceId: z.number(),
-        tokens: z.string(),
-        tokenRotation: z.boolean(),
-        messageDelay: z.number(),
-        mainMessage: z.string(),
-        secondaryMessage: z.string(),
-        categoryName: z.string(),
-        organizations: z.string(),
-        queueMode: z.enum(["1x1", "2x2", "3x3", "4x4"]),
-      }))
-      .mutation(({ input }) => db.createOrUpdateInstanceSettings(input.instanceId, input)),
-  }),
-
-  queueModes: router({
-    list: publicProcedure
-      .input(z.object({ instanceId: z.number() }))
-      .query(({ input }) => db.getQueueModes(input.instanceId)),
-  }),
-
-  organizations: router({
-    list: publicProcedure
-      .input(z.object({ instanceId: z.number() }))
-      .query(({ input }) => db.getOrganizations(input.instanceId)),
-  }),
-
-  statistics: router({
-    get: publicProcedure
-      .input(z.object({ instanceId: z.number() }))
-      .query(({ input }) => db.getStatistics(input.instanceId)),
-    
-    update: publicProcedure
-      .input(z.object({
-        instanceId: z.number(),
-        entries: z.number().optional(),
-        activeQueues: z.number().optional(),
-        matchesFound: z.number().optional(),
-        dmsSent: z.number().optional(),
-        uptime: z.number().optional(),
-      }))
-      .mutation(({ input }) => db.updateStatistics(input.instanceId, input)),
-  }),
-
-  logs: router({
-    list: publicProcedure
-      .input(z.object({ instanceId: z.number(), limit: z.number().default(100) }))
-      .query(({ input }) => db.getInstanceLogs(input.instanceId, input.limit)),
-    
-    add: publicProcedure
-      .input(z.object({
-        instanceId: z.number(),
-        level: z.enum(["INFO", "SUCCESS", "WARNING", "ERROR"]),
-        message: z.string(),
-      }))
-      .mutation(({ input }) => db.addLog(input.instanceId, input.level, input.message)),
-    
-    clear: publicProcedure
-      .input(z.object({ instanceId: z.number() }))
-      .mutation(({ input }) => db.clearInstanceLogs(input.instanceId)),
-  }),
 });
+
+export function registerBotApi(app: express.Express) {
+  // Endpoints para o frontend estático
+  app.get("/api/bot/status/:name", async (req, res) => {
+    const instances = await db.getUserInstances(DEFAULT_USER.id);
+    const instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
+    if (!instance) return res.status(404).json({ error: "Not found" });
+    const status = botManager.getBotInstanceStatus(instance.id);
+    const stats = await db.getStatistics(instance.id);
+    
+    const formatUptime = (seconds: number) => {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+    };
+
+    res.json({
+      isRunning: status.isRunning,
+      stats: stats ? { ...stats, uptime: formatUptime(stats.uptime) } : null
+    });
+  });
+
+  app.get("/api/bot/config/:name", async (req, res) => {
+    const instances = await db.getUserInstances(DEFAULT_USER.id);
+    const instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
+    if (!instance) return res.status(404).json({ error: "Not found" });
+    const settings = await db.getInstanceSettings(instance.id);
+    res.json({
+      tokens: settings?.tokens || "",
+      rotation: settings?.rotationMinutes || 90,
+      category: settings?.category || "Mobile",
+      mensagem: settings?.mainMessage || ""
+    });
+  });
+
+  app.post("/api/bot/config/:name", async (req, res) => {
+    const instances = await db.getUserInstances(DEFAULT_USER.id);
+    let instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
+    if (!instance) {
+        instance = await db.createInstance(DEFAULT_USER.id, req.params.name === "BOT1" ? "BOT 1" : "BOT 2");
+    }
+    const { tokens, rotation, category, mensagem } = req.body;
+    await db.createOrUpdateInstanceSettings(instance.id, {
+      instanceId: instance.id,
+      tokens,
+      tokenRotation: true,
+      rotationMinutes: parseInt(rotation),
+      category,
+      mainMessage: mensagem,
+      secondaryMessage: "",
+      delaySeconds: 12,
+      organizations: "{}",
+      queueMode: "2x2"
+    });
+    res.json({ success: true });
+  });
+
+  app.post("/api/bot/start/:name", async (req, res) => {
+    const instances = await db.getUserInstances(DEFAULT_USER.id);
+    const instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
+    if (!instance) return res.status(404).json({ error: "Not found" });
+    const result = await botManager.startBotInstance(instance.id);
+    res.json({ success: result.status === "success", message: result.message });
+  });
+
+  app.post("/api/bot/stop/:name", async (req, res) => {
+    const instances = await db.getUserInstances(DEFAULT_USER.id);
+    const instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
+    if (!instance) return res.status(404).json({ error: "Not found" });
+    const result = await botManager.stopBotInstance(instance.id);
+    res.json({ success: result.status === "success", message: result.message });
+  });
+
+  app.get("/api/bot/logs/:name", async (req, res) => {
+    const instances = await db.getUserInstances(DEFAULT_USER.id);
+    const instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
+    if (!instance) return res.status(404).json({ error: "Not found" });
+    const logs = await db.getInstanceLogs(instance.id, 50);
+    res.json(logs);
+  });
+
+  app.delete("/api/bot/logs/:name", async (req, res) => {
+    const instances = await db.getUserInstances(DEFAULT_USER.id);
+    const instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
+    if (!instance) return res.status(404).json({ error: "Not found" });
+    await db.clearInstanceLogs(instance.id);
+    res.json({ success: true });
+  });
+
+  app.post("/api/bot/reset/:name", async (req, res) => {
+    const instances = await db.getUserInstances(DEFAULT_USER.id);
+    const instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
+    if (!instance) return res.status(404).json({ error: "Not found" });
+    await db.resetStatistics(instance.id);
+    res.json({ success: true });
+  });
+}
 
 export type AppRouter = typeof appRouter;
