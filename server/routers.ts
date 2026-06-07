@@ -65,6 +65,11 @@ export function registerBotApi(app: express.Express) {
   app.post("/api/bot/config/:name", async (req, res) => {
     try {
       const { tokens, rotation, category, mensagem } = req.body;
+      
+      if (!tokens || tokens.trim() === "") {
+        return res.status(400).json({ success: false, message: "Tokens são obrigatórios" });
+      }
+      
       const instances = await db.getUserInstances(DEFAULT_USER.id);
       let instance = instances.find(i => i.name.replace(/\s+/g, "") === req.params.name);
       
@@ -72,7 +77,11 @@ export function registerBotApi(app: express.Express) {
         instance = await db.createInstance(DEFAULT_USER.id, req.params.name === "BOT1" ? "BOT 1" : "BOT 2");
       }
 
-      await db.createOrUpdateInstanceSettings(instance.id, {
+      if (!instance) {
+        return res.status(500).json({ success: false, message: "Falha ao criar instância" });
+      }
+
+      const result = await db.createOrUpdateInstanceSettings(instance.id, {
         instanceId: instance.id,
         tokens: tokens || "",
         rotationMinutes: parseInt(rotation) || 90,
@@ -81,10 +90,14 @@ export function registerBotApi(app: express.Express) {
         category: category || "Mobile"
       });
 
-      res.json({ success: true });
+      if (!result) {
+        return res.status(500).json({ success: false, message: "Falha ao salvar configurações" });
+      }
+
+      res.json({ success: true, data: result });
     } catch (e: any) {
-      console.error("Error saving config:", e);
-      res.status(500).json({ success: false, message: e.message });
+      console.error("Error saving config:", e.message, e.stack);
+      res.status(500).json({ success: false, message: e.message || "Erro interno do servidor" });
     }
   });
 
