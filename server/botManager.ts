@@ -12,12 +12,24 @@ interface BotInstance {
 
 const botInstances = new Map<number, BotInstance>();
 
+// Memória temporária para logs e status caso o banco falhe
+export const memoryLogs = new Map<number, any[]>();
+export const memoryStatus = new Map<number, boolean>();
+
+function addMemoryLog(instanceId: number, level: string, message: string) {
+    const logs = memoryLogs.get(instanceId) || [];
+    logs.unshift({
+        level,
+        message,
+        createdAt: new Date().toISOString()
+    });
+    memoryLogs.set(instanceId, logs.slice(0, 50));
+}
+
 export async function startBotInstance(instanceId: number, botName: string = "BOT1") {
   try {
-    // Tentar pegar configurações locais primeiro (mais rápido e seguro)
     let settings = await getSettings(botName);
     
-    // Se não tiver local, tenta no banco
     if (!settings) {
         try {
             const dbSettings = await db.getInstanceSettings(instanceId);
@@ -34,7 +46,7 @@ export async function startBotInstance(instanceId: number, botName: string = "BO
     }
 
     if (!settings || !settings.tokens) {
-      return { status: "error", message: "Configuração ou tokens não encontrados. Salve primeiro!" };
+      return { status: "error", message: "Tokens não encontrados. Salve primeiro!" };
     }
 
     let instance = botInstances.get(instanceId);
@@ -49,9 +61,9 @@ export async function startBotInstance(instanceId: number, botName: string = "BO
       const client = new Client({ checkUpdate: false });
 
       client.on('ready', async () => {
-        const timestamp = new Date().toLocaleTimeString();
-        const logMsg = `[${timestamp}] SUCCESS Logado como @${client.user?.username}`;
+        const logMsg = `✓ Logado como @${client.user?.username}`;
         console.log(logMsg);
+        addMemoryLog(instanceId, "SUCCESS", logMsg);
         await db.addLog(instanceId, "SUCCESS", logMsg).catch(() => {});
       });
 
@@ -59,15 +71,15 @@ export async function startBotInstance(instanceId: number, botName: string = "BO
         await client.login(token.trim());
         clients.push(client);
       } catch (err: any) {
-        const timestamp = new Date().toLocaleTimeString();
-        const errorMsg = `[${timestamp}] ERROR Falha no token: ${err.message}`;
+        const errorMsg = `✕ Falha no token: ${err.message}`;
         console.error(errorMsg);
+        addMemoryLog(instanceId, "ERROR", errorMsg);
         await db.addLog(instanceId, "ERROR", errorMsg).catch(() => {});
       }
     }
 
     if (clients.length === 0) {
-      return { status: "error", message: "Nenhum token válido conseguiu logar." };
+      return { status: "error", message: "Nenhum token conseguiu logar." };
     }
 
     const interval = setInterval(async () => {
@@ -86,8 +98,11 @@ export async function startBotInstance(instanceId: number, botName: string = "BO
       interval: interval
     };
     botInstances.set(instanceId, newInstance);
+    memoryStatus.set(instanceId, true);
 
     await db.updateInstanceStatus(instanceId, "online").catch(() => {});
+    addMemoryLog(instanceId, "INFO", "Bot iniciado com sucesso.");
+    
     return { status: "success", message: `Bot iniciado com ${clients.length} conta(s).` };
   } catch (error: any) {
     return { status: "error", message: error.message };
@@ -102,9 +117,9 @@ export async function stopBotInstance(instanceId: number) {
       try { client.destroy(); } catch (err) {}
     }
     instance.isRunning = false;
+    memoryStatus.set(instanceId, false);
     await db.updateInstanceStatus(instanceId, "offline").catch(() => {});
-    const timestamp = new Date().toLocaleTimeString();
-    await db.addLog(instanceId, "INFO", `[${timestamp}] INFO Instância parada`).catch(() => {});
+    addMemoryLog(instanceId, "INFO", "Bot parado pelo usuário.");
     return { status: "success", message: "Bot parado" };
   }
   return { status: "error", message: "Bot não está rodando" };
@@ -112,8 +127,9 @@ export async function stopBotInstance(instanceId: number) {
 
 export function getBotInstanceStatus(instanceId: number) {
   const instance = botInstances.get(instanceId);
+  const isRunning = instance?.isRunning || memoryStatus.get(instanceId) || false;
   return {
-    isRunning: instance?.isRunning || false,
+    isRunning: isRunning,
     uptime: instance?.uptimeSeconds || 0
   };
 }

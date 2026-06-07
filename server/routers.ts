@@ -11,9 +11,6 @@ import { saveSettings, getSettings } from "./localSettings";
 
 const DEFAULT_USER = { id: 1, name: "Admin" };
 
-// Memória temporária para logs em caso de falha no banco
-const memoryLogs = new Map<number, any[]>();
-
 export const appRouter = router({
   system: systemRouter,
   instances: instancesRouter,
@@ -27,7 +24,6 @@ export function registerBotApi(app: express.Express) {
     try {
       const botName = req.params.name;
       const instanceId = botName === "BOT1" ? 1 : 2;
-      
       const status = botManager.getBotInstanceStatus(instanceId);
       
       let stats = null;
@@ -56,7 +52,6 @@ export function registerBotApi(app: express.Express) {
     try {
       const botName = req.params.name;
       const localSettings = await getSettings(botName);
-      
       if (localSettings) {
         return res.json({
           tokens: localSettings.tokens,
@@ -65,7 +60,6 @@ export function registerBotApi(app: express.Express) {
           mensagem: localSettings.mainMessage
         });
       }
-
       res.json({ tokens: "", rotation: 90, category: "Mobile", mensagem: "" });
     } catch (e) {
       res.json({ tokens: "", rotation: 90, category: "Mobile", mensagem: "" });
@@ -87,10 +81,9 @@ export function registerBotApi(app: express.Express) {
     };
 
     try {
-      // SALVAMENTO LOCAL É PRIORIDADE - Não depende de banco
       await saveSettings(botName, settings);
       
-      // Tentar salvar no banco em background
+      // Sincronizar banco em background
       db.getUserInstances(DEFAULT_USER.id).then(async (instances) => {
         let instance = instances.find(i => i.name.replace(/\s+/g, "") === botName);
         if (!instance) {
@@ -104,9 +97,9 @@ export function registerBotApi(app: express.Express) {
         }
       }).catch(() => {});
 
-      res.json({ success: true, message: "Configuração salva com sucesso!" });
+      res.json({ success: true, message: "Configuração salva!" });
     } catch (e: any) {
-      res.status(500).json({ success: false, message: "Erro ao salvar: " + e.message });
+      res.status(500).json({ success: false, message: "Erro ao salvar" });
     }
   });
 
@@ -142,9 +135,14 @@ export function registerBotApi(app: express.Express) {
       
       let logs: any[] = [];
       try {
-        logs = await db.getInstanceLogs(instanceId, 50);
+        const dbLogs = await db.getInstanceLogs(instanceId, 50);
+        const mLogs = botManager.memoryLogs.get(instanceId) || [];
+        // Combinar logs do banco e da memória, remover duplicados por mensagem e data
+        logs = [...mLogs, ...dbLogs].sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        ).slice(0, 50);
       } catch (e) {
-        logs = memoryLogs.get(instanceId) || [];
+        logs = botManager.memoryLogs.get(instanceId) || [];
       }
       
       res.json(logs);
@@ -158,7 +156,7 @@ export function registerBotApi(app: express.Express) {
     try {
       const botName = req.params.name;
       const instanceId = botName === "BOT1" ? 1 : 2;
-      memoryLogs.set(instanceId, []);
+      botManager.memoryLogs.set(instanceId, []);
       await db.clearInstanceLogs(instanceId).catch(() => {});
       res.json({ success: true });
     } catch (e) {
