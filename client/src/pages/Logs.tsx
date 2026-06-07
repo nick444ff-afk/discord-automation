@@ -45,8 +45,8 @@ export default function Logs() {
             </SelectTrigger>
             <SelectContent>
               {instances?.map((instance) => (
-                <SelectItem key={instance.id} value={instance.id.toString()}>
-                  {instance.name || `Bot ${instance.id}`}
+                <SelectItem key={instance?.id} value={instance?.id?.toString() || ""}>
+                  {instance?.name || `Bot ${instance?.id}`}
                 </SelectItem>
               ))}
             </SelectContent>

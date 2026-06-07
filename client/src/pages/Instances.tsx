@@ -8,6 +8,15 @@ import { toast } from "sonner";
 import InstanceCard from "@/components/InstanceCard";
 import InstanceSettings from "@/components/InstanceSettings";
 
+const ORGANIZATIONS = [
+  "Strike", "Tiger", "Nexus", "Venom", "Yakuza", "Helipa", "Fusion", "Complexo",
+  "Colombia", "Olympus", "Gold", "Alfa", "Capao", "Whale", "Corolla", "Dragon",
+  "Money", "Furia", "Coruja", "Monkey", "Hunter", "Win", "Hare", "Morcego",
+  "King", "Surf", "Tokio", "Paris", "Panda", "Shark", "Pocoyo", "Duck",
+  "Pato", "Wurf", "Goat", "Scorpion", "Cipher", "Snoopy", "Waves", "Dough",
+  "Mirante", "Neon"
+];
+
 export default function Instances() {
   const [selectedInstanceId, setSelectedInstanceId] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -25,6 +34,8 @@ export default function Instances() {
       </div>
     );
   }
+
+  const selectedInstance = instances?.find((inst: any) => inst && inst.id === selectedInstanceId);
 
   return (
     <div className="space-y-6">
@@ -46,19 +57,21 @@ export default function Instances() {
         {/* Instances List */}
         <div className="lg:col-span-2 space-y-4">
           {instances && instances.length > 0 ? (
-            instances.map((instance) => (
+            instances.map((instance: any) => (
               <div
-                key={instance.id}
+                key={instance?.id}
                 onClick={() => {
-                  setSelectedInstanceId(instance.id);
-                  setShowSettings(false);
+                  if (instance?.id) {
+                    setSelectedInstanceId(instance.id);
+                    setShowSettings(false);
+                  }
                 }}
                 className="cursor-pointer transition-all"
               >
                 <InstanceCard
                   instance={instance}
-                  isSelected={selectedInstanceId === instance.id}
-                  onSelect={() => setSelectedInstanceId(instance.id)}
+                  isSelected={selectedInstanceId === instance?.id}
+                  onSelect={() => instance?.id && setSelectedInstanceId(instance.id)}
                 />
               </div>
             ))
@@ -76,21 +89,20 @@ export default function Instances() {
         </div>
 
         {/* Details Panel */}
-        <div className="space-y-4">
-          {selectedInstanceId ? (
-            <>
-              <Card className="card-premium">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Detalhes</h3>
+        {selectedInstance && (
+          <div className="space-y-4">
+            <Card className="card-premium p-6">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold">{selectedInstance?.name}</h3>
                   <Badge
-                    variant="outline"
                     className={
-                      instances?.find(i => i.id === selectedInstanceId)?.status === "online"
+                      selectedInstance?.status === "online"
                         ? "bg-green-500/10 text-green-400 border-green-500/30"
                         : "bg-red-500/10 text-red-400 border-red-500/30"
                     }
                   >
-                    {instances?.find(i => i.id === selectedInstanceId)?.status === "online"
+                    {selectedInstance?.status === "online"
                       ? "Online"
                       : "Offline"}
                   </Badge>
@@ -98,49 +110,45 @@ export default function Instances() {
                 <div className="space-y-3 text-sm">
                   <div>
                     <p className="text-muted-foreground">ID</p>
-                    <p className="font-mono text-foreground">{selectedInstanceId}</p>
+                    <p className="font-mono text-foreground">{selectedInstance?.id}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Uptime</p>
                     <p className="font-mono text-foreground">
-                      {instances?.find(i => i.id === selectedInstanceId)?.uptime || 0}h
+                      {selectedInstance?.uptime || 0}h
                     </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Criada em</p>
                     <p className="font-mono text-foreground">
-                      {instances?.find(i => i.id === selectedInstanceId)?.createdAt
-                        ? new Date(instances.find(i => i.id === selectedInstanceId)!.createdAt).toLocaleDateString()
+                      {selectedInstance?.createdAt
+                        ? new Date(selectedInstance.createdAt).toLocaleDateString()
                         : "-"}
                     </p>
                   </div>
                 </div>
-              </Card>
+              </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 mt-6">
                 <Button
-                  variant="outline"
-                  className="flex-1 gap-2"
                   onClick={() => setShowSettings(!showSettings)}
+                  className="flex-1 btn-premium-primary"
                 >
-                  {showSettings ? "Detalhes" : "Configurações"}
+                  Configurar
                 </Button>
               </div>
-            </>
-          ) : (
-            <Card className="card-premium flex items-center justify-center h-32">
-              <p className="text-muted-foreground text-sm">Selecione uma instância</p>
             </Card>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Settings Panel */}
-      {selectedInstanceId && showSettings && (
-        <div>
-          <h2 className="text-2xl font-bold mb-4">Configurações da Instância</h2>
-          <InstanceSettings instanceId={selectedInstanceId} settings={settings} />
-        </div>
+      {showSettings && selectedInstanceId && settings && (
+        <InstanceSettings
+          instanceId={selectedInstanceId}
+          settings={settings}
+          organizations={ORGANIZATIONS}
+        />
       )}
     </div>
   );

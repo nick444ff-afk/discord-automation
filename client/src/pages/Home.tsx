@@ -49,7 +49,10 @@ export default function Home() {
   // Auto-select first instance
   useEffect(() => {
     if (instances && instances.length > 0 && selectedInstanceId === null) {
-      setSelectedInstanceId(instances[0].id);
+      const firstInstance = instances[0];
+      if (firstInstance && firstInstance.id) {
+        setSelectedInstanceId(firstInstance.id);
+      }
     }
   }, [instances, selectedInstanceId]);
 
@@ -116,13 +119,13 @@ export default function Home() {
           {/* Status */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${selectedInstance?.status === "online" ? "bg-green-500" : "bg-red-500"}`} />
+              <div className={`w-3 h-3 rounded-full ${selectedInstance && selectedInstance.status === "online" ? "bg-green-500" : "bg-red-500"}`} />
               <span className="text-sm text-slate-400">
-                {selectedInstance?.status === "online" ? "Conectado" : "Desconectado"}
+                {selectedInstance && selectedInstance.status === "online" ? "Conectado" : "Desconectado"}
               </span>
             </div>
-            <Badge className={selectedInstance?.status === "online" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}>
-              {selectedInstance?.status === "online" ? "RODANDO" : "PARADO"}
+            <Badge className={selectedInstance && selectedInstance.status === "online" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}>
+              {selectedInstance && selectedInstance.status === "online" ? "RODANDO" : "PARADO"}
             </Badge>
           </div>
 
@@ -145,7 +148,7 @@ export default function Home() {
 
           {/* Instância Ativa */}
           <p className="text-xs text-slate-500 uppercase tracking-wider">
-            INSTANCIA ATIVA: {selectedInstance?.name}
+            INSTANCIA ATIVA: {selectedInstance ? selectedInstance.name : "Nenhuma"}
           </p>
         </div>
       </Card>
@@ -155,7 +158,7 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Botão Circular de Controle */}
           <Card className="bg-gradient-to-br from-slate-800/40 to-slate-900/40 border-slate-700/50 p-8 backdrop-blur-sm flex flex-col items-center justify-center">
-            <h3 className="text-lg font-semibold text-white mb-8">Controle - {selectedInstance?.name}</h3>
+            <h3 className="text-lg font-semibold text-white mb-8">Controle - {selectedInstance ? selectedInstance.name : "Nenhuma"}</h3>
             <button
               className="w-32 h-32 rounded-full border-4 border-blue-500/50 flex items-center justify-center hover:border-blue-500 transition-all hover:shadow-lg hover:shadow-blue-500/20 group"
               onClick={() => {
@@ -169,7 +172,7 @@ export default function Home() {
             >
               <Play className="w-12 h-12 text-blue-400 group-hover:text-blue-300 transition-colors" />
             </button>
-            <p className="text-slate-400 text-sm mt-6">Clique para {selectedInstance?.status === "online" ? "parar" : "iniciar"} o bot</p>
+            <p className="text-slate-400 text-sm mt-6">Clique para {selectedInstance && selectedInstance.status === "online" ? "parar" : "iniciar"} o bot</p>
           </Card>
 
           {/* Cards de Estatísticas */}
