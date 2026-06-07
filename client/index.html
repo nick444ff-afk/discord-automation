@@ -47,7 +47,11 @@ input, textarea, select { width: 100%; padding: 14px; margin-top: 6px; border-ra
 .orgs-box { background: #020617; border-radius: 14px; padding: 10px 15px; max-height: 180px; overflow-y: auto; margin-top: 8px; border: 1px solid rgba(255,255,255,0.06); }
 .org-item { display: flex; align-items: center; gap: 12px; padding: 9px 5px; cursor: pointer; font-size: 15px; }
 .save-btn { width: 100%; padding: 15px; margin-top: 20px; border: none; border-radius: 12px; background: linear-gradient(135deg, #1d4ed8, #2563eb); color: #fff; font-weight: 700; font-size: 15px; cursor: pointer; box-shadow: 0 4px 15px rgba(29,78,216,0.35); }
-.logs { background: #000; padding: 15px; border-radius: 12px; font-family: 'Courier New', monospace; font-size: 13px; height: 200px; overflow-y: auto; line-height: 1.6; border: 1px solid rgba(255,255,255,0.05); }
+.logs { background: #000; padding: 15px; border-radius: 12px; font-family: 'Courier New', monospace; font-size: 13px; height: 200px; overflow-y: auto; line-height: 1.6; border: 1px solid rgba(255,255,255,0.05); color: #00ff00; }
+.log-info { color: #fff; }
+.log-warn { color: #facc15; }
+.log-error { color: #ff5a5a; }
+.log-success { color: #22c55e; }
 .clear-logs-btn { margin-top: 12px; width: 100%; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,90,90,0.35); background: rgba(255,90,90,0.1); color: #ff5a5a; font-weight: 700; cursor: pointer; }
 .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1d4ed8; color: #fff; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: 600; box-shadow: 0 8px 25px rgba(0,0,0,0.5); z-index: 9999; transition: all 0.35s ease; opacity: 0; white-space: nowrap; }
 .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
@@ -135,14 +139,6 @@ function showToast(msg, type='info') {
     setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-function addLog(msg, type='info') {
-    const l = document.getElementById('logs');
-    const div = document.createElement('div');
-    div.className = `log-entry log-${type}`;
-    div.innerHTML = `<span class="log-time">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
-    l.prepend(div);
-}
-
 async function carregarConfiguracao() {
     try {
         const r = await fetch(`${API_URL}/config/${botAtivo}`);
@@ -159,7 +155,10 @@ async function carregarConfiguracao() {
 
 async function salvarConfiguracao() {
     const tokens = document.getElementById('tokens').value.trim();
-    if (!tokens) return showToast('Insira pelo menos um token!', 'error');
+    if (!tokens) {
+        showToast('Insira pelo menos um token!', 'error');
+        return;
+    }
     
     const data = {
         tokens,
@@ -177,14 +176,17 @@ async function salvarConfiguracao() {
         if (r.ok) {
             configSalva = true;
             showToast('Configuração salva!', 'success');
-            addLog('Configurações atualizadas.', 'success');
+        } else {
+            showToast('Erro ao salvar no servidor!', 'error');
         }
-    } catch (e) { showToast('Erro ao salvar!', 'error'); }
+    } catch (e) { showToast('Erro na conexão!', 'error'); }
 }
 
 async function toggleBot() {
-    const tokens = document.getElementById('tokens').value.trim();
-    if (!tokens || !configSalva) return showToast('Salve as configurações com tokens primeiro!', 'error');
+    if (!configSalva) {
+        showToast('Salve as configurações primeiro!', 'error');
+        return;
+    }
 
     const action = botLigado ? 'stop' : 'start';
     try {
