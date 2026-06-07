@@ -11,21 +11,25 @@ let _dbConnecting = false;
 export async function getDb() {
   if (!_db && !_dbConnecting && ENV.databaseUrl) {
     _dbConnecting = true;
-    try {
-      const client = postgres(ENV.databaseUrl, {
-        connect_timeout: 10,
-        idle_timeout: 30,
-        max_lifetime: 60 * 60,
-        max: 1,
-      });
-      _db = drizzle(client);
-      console.log("[Database] Connected successfully");
-    } catch (error) {
-      console.error("[Database] Failed to connect:", error);
-      _db = null;
-    } finally {
-      _dbConnecting = false;
+    let retries = 5;
+    while (retries > 0 && !_db) {
+      try {
+        const client = postgres(ENV.databaseUrl, {
+          connect_timeout: 20,
+          idle_timeout: 30,
+          max_lifetime: 60 * 60,
+          max: 1,
+        });
+        _db = drizzle(client);
+        console.log("[Database] Connected successfully");
+        break;
+      } catch (error) {
+        console.error(`[Database] Connection attempt failed (${retries} retries left):`, error);
+        retries--;
+        if (retries > 0) await new Promise(res => setTimeout(res, 2000));
+      }
     }
+    _dbConnecting = false;
   }
   return _db;
 }
