@@ -2,14 +2,17 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
-import { Server as SocketIOServer } from "socket.io";
-import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter, registerBotApi } from "../routers";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { setupVite } from "./vite";
+import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -52,7 +55,11 @@ async function startServer() {
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
-    const distPath = path.resolve(import.meta.dirname, "../public");
+    // No Railway, o build coloca os arquivos em dist/public
+    // O arquivo index.js fica em dist/index.js
+    // Então o caminho relativo de dist/index.js para dist/public é ./public
+    const distPath = path.resolve(__dirname, "public");
+    console.log("Serving static files from:", distPath);
     app.use(express.static(distPath));
     app.use("*", (req, res) => {
         if (req.originalUrl.startsWith("/api")) return res.status(404).end();
