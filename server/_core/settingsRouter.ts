@@ -61,7 +61,7 @@ export const settingsRouter = router({
           await db.setQueueModes(input.instanceId, [input.queueMode]);
         }
 
-        const tokenCount = input.tokens.split('\n').filter(t => t.trim()).length;
+        const tokenCount = input.tokens.split(/[\n,]+/).filter(t => t.trim()).length;
         await db.addLog(input.instanceId, "SUCCESS", `[SISTEMA] Configuracoes salvas com sucesso! Tokens: ${tokenCount} | Delay: ${input.messageDelay}s | Categoria: ${input.categoryName}`);
 
         return {

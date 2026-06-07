@@ -9,11 +9,11 @@ let _dbConnecting = false;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
-  if (!_db && !_dbConnecting && process.env.DATABASE_URL) {
+  if (!_db && !_dbConnecting && ENV.databaseUrl) {
     _dbConnecting = true;
     try {
-      const client = postgres(process.env.DATABASE_URL, {
-        connect_timeout: 5,
+      const client = postgres(ENV.databaseUrl, {
+        connect_timeout: 10,
         idle_timeout: 30,
         max_lifetime: 60 * 60,
         max: 1,
@@ -112,11 +112,9 @@ export async function createInstance(userId: number, name: string): Promise<Inst
     name,
     status: 'offline',
     uptime: 0,
-  });
+  }).returning();
 
-  const insertedId = (result as any).insertId;
-  const instance = await db.select().from(instances).where(eq(instances.id, insertedId)).limit(1);
-  return instance.length > 0 ? instance[0] : null;
+  return result.length > 0 ? result[0] : null;
 }
 
 export async function getUserInstances(userId: number): Promise<Instance[]> {
@@ -168,10 +166,8 @@ export async function createOrUpdateInstanceSettings(instanceId: number, setting
       const result = await db.insert(instanceSettings).values({
         instanceId,
         ...settings,
-      } as InsertInstanceSettings);
-      const insertedId = (result as any).insertId;
-      const created = await db.select().from(instanceSettings).where(eq(instanceSettings.id, insertedId)).limit(1);
-      return created.length > 0 ? created[0] : null;
+      } as InsertInstanceSettings).returning();
+      return result.length > 0 ? result[0] : null;
     }
   } catch (error) {
     console.error("[Database] Error creating or updating instance settings:", error);
@@ -266,11 +262,9 @@ export async function addLog(instanceId: number, level: 'INFO' | 'SUCCESS' | 'WA
     instanceId,
     level,
     message,
-  });
+  }).returning();
 
-  const insertedId = (result as any).insertId;
-  const log = await db.select().from(logs).where(eq(logs.id, insertedId)).limit(1);
-  return log.length > 0 ? log[0] : null;
+  return result.length > 0 ? result[0] : null;
 }
 
 export async function getInstanceLogs(instanceId: number, limit: number = 100): Promise<Log[]> {

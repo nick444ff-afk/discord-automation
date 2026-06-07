@@ -99,28 +99,26 @@ export function registerBotApi(app: express.Express) {
       await saveSettings(botName, settings);
       console.log(`[Config] Settings for ${botName} saved to local file.`);
 
-      // 2. Responder IMEDIATAMENTE ao cliente para não dar timeout
-      res.json({ success: true, message: "Configurações salvas com sucesso!" });
-
-      // 3. Sincronizar com o DB em background (não bloqueia a resposta)
-      (async () => {
-        try {
-          const instances = await db.getUserInstances(DEFAULT_USER.id);
-          let instance = instances.find(i => i.name.replace(/\s+/g, "") === botName);
-          if (!instance) {
-            instance = await db.createInstance(DEFAULT_USER.id, botName === "BOT1" ? "BOT 1" : "BOT 2");
-          }
-          if (instance) {
-            await db.createOrUpdateInstanceSettings(instance.id, {
-              instanceId: instance.id,
-              ...settings
-            });
-            await db.addLog(instance.id, 'SUCCESS', `[SISTEMA] Configurações salvas e prontas para uso.`);
-          }
-        } catch (dbError) {
-          console.warn("[Database] Sync failed, but settings are safe in local file.");
+      // 2. Sincronizar com o DB ANTES de responder para garantir persistência
+      try {
+        const instances = await db.getUserInstances(DEFAULT_USER.id);
+        let instance = instances.find(i => i.name.replace(/\s+/g, "") === botName);
+        if (!instance) {
+          instance = await db.createInstance(DEFAULT_USER.id, botName === "BOT1" ? "BOT 1" : "BOT 2");
         }
-      })();
+        if (instance) {
+          await db.createOrUpdateInstanceSettings(instance.id, {
+            instanceId: instance.id,
+            ...settings
+          });
+          await db.addLog(instance.id, 'SUCCESS', `[SISTEMA] Configurações salvas e prontas para uso.`);
+        }
+      } catch (dbError) {
+        console.warn("[Database] Sync failed, but settings are safe in local file.");
+      }
+
+      // 3. Responder ao cliente
+      res.json({ success: true, message: "Configurações salvas com sucesso!" });
 
     } catch (e: any) {
       console.error("Error saving config:", e.message);

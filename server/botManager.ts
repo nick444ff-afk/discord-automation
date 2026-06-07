@@ -23,7 +23,7 @@ export async function startBotInstance(instanceId: number) {
       return { status: "error", message: "Bot já está rodando" };
     }
 
-    const tokens = settings.tokens.split('\n').filter(t => t.trim());
+    const tokens = settings.tokens.split(/[\n,]+/).filter(t => t.trim());
     const clients: Client[] = [];
 
     for (const token of tokens) {
