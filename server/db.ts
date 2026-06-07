@@ -123,7 +123,12 @@ export async function getUserInstances(userId: number): Promise<Instance[]> {
   const db = await getDb();
   if (!db) return [];
 
-  return await db.select().from(instances).where(eq(instances.userId, userId));
+  try {
+    return await db.select().from(instances).where(eq(instances.userId, userId));
+  } catch (error) {
+    console.error("[Database] Error getting user instances:", error);
+    return [];
+  }
 }
 
 export async function getInstanceById(id: number): Promise<Instance | null> {
@@ -152,20 +157,25 @@ export async function createOrUpdateInstanceSettings(instanceId: number, setting
   const db = await getDb();
   if (!db) return null;
 
-  const existing = await db.select().from(instanceSettings).where(eq(instanceSettings.instanceId, instanceId)).limit(1);
+  try {
+    const existing = await db.select().from(instanceSettings).where(eq(instanceSettings.instanceId, instanceId)).limit(1);
 
-  if (existing.length > 0) {
-    await db.update(instanceSettings).set({ ...settings, updatedAt: new Date() }).where(eq(instanceSettings.instanceId, instanceId));
-    const updated = await db.select().from(instanceSettings).where(eq(instanceSettings.instanceId, instanceId)).limit(1);
-    return updated.length > 0 ? updated[0] : null;
-  } else {
-    const result = await db.insert(instanceSettings).values({
-      instanceId,
-      ...settings,
-    } as InsertInstanceSettings);
-    const insertedId = (result as any).insertId;
-    const created = await db.select().from(instanceSettings).where(eq(instanceSettings.id, insertedId)).limit(1);
-    return created.length > 0 ? created[0] : null;
+    if (existing.length > 0) {
+      await db.update(instanceSettings).set({ ...settings, updatedAt: new Date() }).where(eq(instanceSettings.instanceId, instanceId));
+      const updated = await db.select().from(instanceSettings).where(eq(instanceSettings.instanceId, instanceId)).limit(1);
+      return updated.length > 0 ? updated[0] : null;
+    } else {
+      const result = await db.insert(instanceSettings).values({
+        instanceId,
+        ...settings,
+      } as InsertInstanceSettings);
+      const insertedId = (result as any).insertId;
+      const created = await db.select().from(instanceSettings).where(eq(instanceSettings.id, insertedId)).limit(1);
+      return created.length > 0 ? created[0] : null;
+    }
+  } catch (error) {
+    console.error("[Database] Error creating or updating instance settings:", error);
+    return null;
   }
 }
 

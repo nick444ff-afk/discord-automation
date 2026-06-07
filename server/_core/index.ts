@@ -10,8 +10,7 @@ import { setupVite } from "./vite";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
-import { getDb } from "./db";
+
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -43,20 +42,6 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   
-  // Migration endpoint
-  app.post("/api/migrate", async (req, res) => {
-    try {
-      console.log("[Migrations] Starting database migrations...");
-      const db = await getDb();
-      await migrate(db, { migrationsFolder: "./drizzle" });
-      console.log("[Migrations] Database migrations completed successfully");
-      res.json({ success: true, message: "Migrations completed successfully" });
-    } catch (error) {
-      console.error("[Migrations] Error running migrations:", error);
-      res.status(500).json({ success: false, error: String(error) });
-    }
-  });
-
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerBotApi(app);
