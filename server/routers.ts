@@ -5,7 +5,6 @@ import * as db from "./db";
 import * as botManager from "./botManager";
 import express from "express";
 
-// Usuário padrão
 const DEFAULT_USER = { id: 1, name: "Admin" };
 
 export const appRouter = router({
@@ -13,97 +12,118 @@ export const appRouter = router({
 });
 
 export function registerBotApi(app: express.Express) {
-  // Endpoints para o frontend estático
+  // GET Status
   app.get("/api/bot/status/:name", async (req, res) => {
-    const instances = await db.getUserInstances(DEFAULT_USER.id);
-    const instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
-    if (!instance) return res.status(404).json({ error: "Not found" });
-    const status = botManager.getBotInstanceStatus(instance.id);
-    const stats = await db.getStatistics(instance.id);
-    
-    const formatUptime = (seconds: number) => {
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = seconds % 60;
-        return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
-    };
-
-    res.json({
-      isRunning: status.isRunning,
-      stats: stats ? { ...stats, uptime: formatUptime(stats.uptime) } : null
-    });
-  });
-
-  app.get("/api/bot/config/:name", async (req, res) => {
-    const instances = await db.getUserInstances(DEFAULT_USER.id);
-    const instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
-    if (!instance) return res.status(404).json({ error: "Not found" });
-    const settings = await db.getInstanceSettings(instance.id);
-    res.json({
-      tokens: settings?.tokens || "",
-      rotation: settings?.rotationMinutes || 90,
-      category: settings?.category || "Mobile",
-      mensagem: settings?.mainMessage || ""
-    });
-  });
-
-  app.post("/api/bot/config/:name", async (req, res) => {
-    const instances = await db.getUserInstances(DEFAULT_USER.id);
-    let instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
-    if (!instance) {
+    try {
+      const instances = await db.getUserInstances(DEFAULT_USER.id);
+      let instance = instances.find(i => i.name.replace(/\s+/g, "") === req.params.name);
+      if (!instance) {
         instance = await db.createInstance(DEFAULT_USER.id, req.params.name === "BOT1" ? "BOT 1" : "BOT 2");
+      }
+      const status = botManager.getBotInstanceStatus(instance.id);
+      const stats = await db.getStatistics(instance.id);
+      
+      const formatUptime = (seconds: number) => {
+          const h = Math.floor(seconds / 3600);
+          const m = Math.floor((seconds % 3600) / 60);
+          const s = seconds % 60;
+          return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+      };
+
+      res.json({
+        isRunning: status.isRunning,
+        stats: stats ? { ...stats, uptime: formatUptime(stats.uptime) } : { entries:0, queues:0, matches:0, dms:0, uptime: "00:00:00" }
+      });
+    } catch (e) {
+      res.status(500).json({ error: "Internal Server Error" });
     }
-    const { tokens, rotation, category, mensagem } = req.body;
-    await db.createOrUpdateInstanceSettings(instance.id, {
-      instanceId: instance.id,
-      tokens,
-      tokenRotation: true,
-      rotationMinutes: parseInt(rotation),
-      category,
-      mainMessage: mensagem,
-      secondaryMessage: "",
-      delaySeconds: 12,
-      organizations: "{}",
-      queueMode: "2x2"
-    });
-    res.json({ success: true });
   });
 
+  // GET Config
+  app.get("/api/bot/config/:name", async (req, res) => {
+    try {
+      const instances = await db.getUserInstances(DEFAULT_USER.id);
+      const instance = instances.find(i => i.name.replace(/\s+/g, "") === req.params.name);
+      if (!instance) return res.json({ tokens: "", rotation: 90, category: "Mobile", mensagem: "" });
+      const settings = await db.getInstanceSettings(instance.id);
+      res.json({
+        tokens: settings?.tokens || "",
+        rotation: settings?.rotationMinutes || 90,
+        category: settings?.category || "Mobile",
+        mensagem: settings?.mainMessage || ""
+      });
+    } catch (e) {
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+
+  // POST Config
+  app.post("/api/bot/config/:name", async (req, res) => {
+    try {
+      const { tokens, rotation, category, mensagem } = req.body;
+      const instances = await db.getUserInstances(DEFAULT_USER.id);
+      let instance = instances.find(i => i.name.replace(/\s+/g, "") === req.params.name);
+      
+      if (!instance) {
+        instance = await db.createInstance(DEFAULT_USER.id, req.params.name === "BOT1" ? "BOT 1" : "BOT 2");
+      }
+
+      await db.createOrUpdateInstanceSettings(instance.id, {
+        instanceId: instance.id,
+        tokens: tokens || "",
+        rotationMinutes: parseInt(rotation) || 90,
+        delaySeconds: 12,
+        mainMessage: mensagem || "",
+        category: category || "Mobile"
+      });
+
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error("Error saving config:", e);
+      res.status(500).json({ success: false, message: e.message });
+    }
+  });
+
+  // START Bot
   app.post("/api/bot/start/:name", async (req, res) => {
     const instances = await db.getUserInstances(DEFAULT_USER.id);
-    const instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
+    const instance = instances.find(i => i.name.replace(/\s+/g, "") === req.params.name);
     if (!instance) return res.status(404).json({ error: "Not found" });
     const result = await botManager.startBotInstance(instance.id);
     res.json({ success: result.status === "success", message: result.message });
   });
 
+  // STOP Bot
   app.post("/api/bot/stop/:name", async (req, res) => {
     const instances = await db.getUserInstances(DEFAULT_USER.id);
-    const instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
+    const instance = instances.find(i => i.name.replace(/\s+/g, "") === req.params.name);
     if (!instance) return res.status(404).json({ error: "Not found" });
     const result = await botManager.stopBotInstance(instance.id);
     res.json({ success: result.status === "success", message: result.message });
   });
 
+  // GET Logs
   app.get("/api/bot/logs/:name", async (req, res) => {
     const instances = await db.getUserInstances(DEFAULT_USER.id);
-    const instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
-    if (!instance) return res.status(404).json({ error: "Not found" });
+    const instance = instances.find(i => i.name.replace(/\s+/g, "") === req.params.name);
+    if (!instance) return res.json([]);
     const logs = await db.getInstanceLogs(instance.id, 50);
     res.json(logs);
   });
 
+  // DELETE Logs
   app.delete("/api/bot/logs/:name", async (req, res) => {
     const instances = await db.getUserInstances(DEFAULT_USER.id);
-    const instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
+    const instance = instances.find(i => i.name.replace(/\s+/g, "") === req.params.name);
     if (!instance) return res.status(404).json({ error: "Not found" });
     await db.clearInstanceLogs(instance.id);
     res.json({ success: true });
   });
 
+  // RESET Stats
   app.post("/api/bot/reset/:name", async (req, res) => {
     const instances = await db.getUserInstances(DEFAULT_USER.id);
-    const instance = instances.find(i => i.name.replace(" ", "") === req.params.name);
+    const instance = instances.find(i => i.name.replace(/\s+/g, "") === req.params.name);
     if (!instance) return res.status(404).json({ error: "Not found" });
     await db.resetStatistics(instance.id);
     res.json({ success: true });
