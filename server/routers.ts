@@ -77,49 +77,54 @@ export function registerBotApi(app: express.Express) {
 
   // POST Config
   app.post("/api/bot/config/:name", async (req, res) => {
+    const { tokens, rotation, category, mensagem } = req.body;
+    const botName = req.params.name;
+    
+    if (!tokens || tokens.trim() === "") {
+      return res.status(400).json({ success: false, message: "Tokens são obrigatórios" });
+    }
+
+    const settings = {
+      tokens: tokens || "",
+      rotationMinutes: parseInt(rotation) || 90,
+      delaySeconds: 12,
+      mainMessage: mensagem || "",
+      category: category || "Mobile"
+    };
+
     try {
-      const { tokens, rotation, category, mensagem } = req.body;
-      const botName = req.params.name;
-      
-      if (!tokens || tokens.trim() === "") {
-        return res.status(400).json({ success: false, message: "Tokens são obrigatórios" });
-      }
-      
-      // Salvar em arquivo local para garantir que funcione sem DB
-      const settings = {
-        tokens: tokens || "",
-        rotationMinutes: parseInt(rotation) || 90,
-        delaySeconds: 12,
-        mainMessage: mensagem || "",
-        category: category || "Mobile"
-      };
-      
+      // 1. Salvar IMEDIATAMENTE no arquivo local (não depende de rede/DB)
       await saveSettings(botName, settings);
+      console.log(`[Config] Settings for ${botName} saved to local file.`);
 
-      // Tentar salvar no DB também, mas não falhar se der erro
-      try {
-        const instances = await db.getUserInstances(DEFAULT_USER.id);
-        let instance = instances.find(i => i.name.replace(/\s+/g, "") === botName);
-        if (!instance) {
-          instance = await db.createInstance(DEFAULT_USER.id, botName === "BOT1" ? "BOT 1" : "BOT 2");
-        }
-        if (instance) {
-          await db.createOrUpdateInstanceSettings(instance.id, {
-            instanceId: instance.id,
-            ...settings
-          });
-          // Adicionar log de sucesso no sistema de logs
-          await db.addLog(instance.id, 'SUCCESS', `Configurações do ${botName} salvas com sucesso!`);
-        }
-      } catch (dbError) {
-        console.warn("[Database] Failed to sync settings to DB, but saved to local file.");
-      }
-
-      console.log(`[Config] Settings for ${botName} saved successfully.`);
+      // 2. Responder IMEDIATAMENTE ao cliente para não dar timeout
       res.json({ success: true, message: "Configurações salvas com sucesso!" });
+
+      // 3. Sincronizar com o DB em background (não bloqueia a resposta)
+      (async () => {
+        try {
+          const instances = await db.getUserInstances(DEFAULT_USER.id);
+          let instance = instances.find(i => i.name.replace(/\s+/g, "") === botName);
+          if (!instance) {
+            instance = await db.createInstance(DEFAULT_USER.id, botName === "BOT1" ? "BOT 1" : "BOT 2");
+          }
+          if (instance) {
+            await db.createOrUpdateInstanceSettings(instance.id, {
+              instanceId: instance.id,
+              ...settings
+            });
+            await db.addLog(instance.id, 'SUCCESS', `[SISTEMA] Configurações salvas e prontas para uso.`);
+          }
+        } catch (dbError) {
+          console.warn("[Database] Sync failed, but settings are safe in local file.");
+        }
+      })();
+
     } catch (e: any) {
-      console.error("Error saving config:", e.message, e.stack);
-      res.status(500).json({ success: false, message: e.message || "Erro interno do servidor" });
+      console.error("Error saving config:", e.message);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: "Erro ao salvar configurações localmente" });
+      }
     }
   });
 
