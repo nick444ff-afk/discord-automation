@@ -6,6 +6,7 @@ import { z } from "zod";
 import * as db from "./db";
 import * as botManager from "./botManager";
 import express from "express";
+import { saveSettings, getSettings } from "./localSettings";
 
 const DEFAULT_USER = { id: 1, name: "Admin" };
 
@@ -46,8 +47,21 @@ export function registerBotApi(app: express.Express) {
   // GET Config
   app.get("/api/bot/config/:name", async (req, res) => {
     try {
+      const botName = req.params.name;
+      // Tentar ler do arquivo local primeiro
+      const localSettings = await getSettings(botName);
+      if (localSettings) {
+        return res.json({
+          tokens: localSettings.tokens,
+          rotation: localSettings.rotationMinutes,
+          category: localSettings.category,
+          mensagem: localSettings.mainMessage
+        });
+      }
+
+      // Fallback para o DB
       const instances = await db.getUserInstances(DEFAULT_USER.id);
-      const instance = instances.find(i => i.name.replace(/\s+/g, "") === req.params.name);
+      const instance = instances.find(i => i.name.replace(/\s+/g, "") === botName);
       if (!instance) return res.json({ tokens: "", rotation: 90, category: "Mobile", mensagem: "" });
       const settings = await db.getInstanceSettings(instance.id);
       res.json({
@@ -65,36 +79,44 @@ export function registerBotApi(app: express.Express) {
   app.post("/api/bot/config/:name", async (req, res) => {
     try {
       const { tokens, rotation, category, mensagem } = req.body;
+      const botName = req.params.name;
       
       if (!tokens || tokens.trim() === "") {
         return res.status(400).json({ success: false, message: "Tokens são obrigatórios" });
       }
       
-      const instances = await db.getUserInstances(DEFAULT_USER.id);
-      let instance = instances.find(i => i.name.replace(/\s+/g, "") === req.params.name);
-      
-      if (!instance) {
-        instance = await db.createInstance(DEFAULT_USER.id, req.params.name === "BOT1" ? "BOT 1" : "BOT 2");
-      }
-
-      if (!instance) {
-        return res.status(500).json({ success: false, message: "Falha ao criar instância" });
-      }
-
-      const result = await db.createOrUpdateInstanceSettings(instance.id, {
-        instanceId: instance.id,
+      // Salvar em arquivo local para garantir que funcione sem DB
+      const settings = {
         tokens: tokens || "",
         rotationMinutes: parseInt(rotation) || 90,
         delaySeconds: 12,
         mainMessage: mensagem || "",
         category: category || "Mobile"
-      });
+      };
+      
+      await saveSettings(botName, settings);
 
-      if (!result) {
-        return res.status(500).json({ success: false, message: "Falha ao salvar configurações" });
+      // Tentar salvar no DB também, mas não falhar se der erro
+      try {
+        const instances = await db.getUserInstances(DEFAULT_USER.id);
+        let instance = instances.find(i => i.name.replace(/\s+/g, "") === botName);
+        if (!instance) {
+          instance = await db.createInstance(DEFAULT_USER.id, botName === "BOT1" ? "BOT 1" : "BOT 2");
+        }
+        if (instance) {
+          await db.createOrUpdateInstanceSettings(instance.id, {
+            instanceId: instance.id,
+            ...settings
+          });
+          // Adicionar log de sucesso no sistema de logs
+          await db.addLog(instance.id, 'SUCCESS', `Configurações do ${botName} salvas com sucesso!`);
+        }
+      } catch (dbError) {
+        console.warn("[Database] Failed to sync settings to DB, but saved to local file.");
       }
 
-      res.json({ success: true, data: result });
+      console.log(`[Config] Settings for ${botName} saved successfully.`);
+      res.json({ success: true, message: "Configurações salvas com sucesso!" });
     } catch (e: any) {
       console.error("Error saving config:", e.message, e.stack);
       res.status(500).json({ success: false, message: e.message || "Erro interno do servidor" });
