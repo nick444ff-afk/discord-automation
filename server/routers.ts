@@ -5,28 +5,26 @@ import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
 
+// Usuário padrão para acesso sem autenticação
+const DEFAULT_USER = {
+  id: 1,
+  openId: "default-user",
+  name: "Admin",
+  email: "admin@discord-bot.local",
+  loginMethod: "local",
+  role: "admin" as const,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  lastSignedIn: new Date(),
+};
+
 export const appRouter = router({
   system: systemRouter,
   
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(() => DEFAULT_USER),
     
-    loginLocal: publicProcedure
-      .input(z.object({ username: z.string(), password: z.string() }))
-      .mutation(({ ctx, input }) => {
-        // Simple local auth for Railway
-        if (input.username === "admin" && input.password === "admin123") {
-          const token = btoa(JSON.stringify({ username: input.username, role: "admin", exp: Date.now() + 86400000 }));
-          const cookieOptions = getSessionCookieOptions(ctx.req);
-          ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: 86400000 });
-          return { success: true, token };
-        }
-        throw new Error("Invalid credentials");
-      }),
-    
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+    logout: publicProcedure.mutation(() => {
       return {
         success: true,
       } as const;
@@ -34,110 +32,80 @@ export const appRouter = router({
   }),
 
   instances: router({
-    list: protectedProcedure.query(({ ctx }) => db.getUserInstances(ctx.user.id)),
+    list: publicProcedure.query(() => db.getUserInstances(DEFAULT_USER.id)),
     
-    create: protectedProcedure
+    create: publicProcedure
       .input(z.object({ name: z.string().min(1) }))
-      .mutation(({ ctx, input }) => db.createInstance(ctx.user.id, input.name)),
+      .mutation(({ input }) => db.createInstance(DEFAULT_USER.id, input.name)),
     
-    getById: protectedProcedure
+    getById: publicProcedure
       .input(z.object({ id: z.number() }))
       .query(({ input }) => db.getInstanceById(input.id)),
     
-    updateStatus: protectedProcedure
+    updateStatus: publicProcedure
       .input(z.object({ id: z.number(), status: z.enum(["online", "offline", "error"]) }))
       .mutation(({ input }) => db.updateInstanceStatus(input.id, input.status)),
     
-    updateUptime: protectedProcedure
+    updateUptime: publicProcedure
       .input(z.object({ id: z.number(), uptime: z.number() }))
       .mutation(({ input }) => db.updateInstanceUptime(input.id, input.uptime)),
   }),
 
   settings: router({
-    get: protectedProcedure
+    get: publicProcedure
       .input(z.object({ instanceId: z.number() }))
       .query(({ input }) => db.getInstanceSettings(input.instanceId)),
     
-    save: protectedProcedure
+    save: publicProcedure
       .input(z.object({
         instanceId: z.number(),
         tokens: z.string(),
-        rotationMinutes: z.number(),
-        delaySeconds: z.number(),
+        tokenRotation: z.boolean(),
+        messageDelay: z.number(),
         mainMessage: z.string(),
-        category: z.string(),
+        secondaryMessage: z.string(),
+        categoryName: z.string(),
+        organizations: z.string(),
+        queueMode: z.enum(["1x1", "2x2", "3x3", "4x4"]),
       }))
-      .mutation(({ input }) => db.createOrUpdateInstanceSettings(input.instanceId, {
-        tokens: input.tokens,
-        rotationMinutes: input.rotationMinutes,
-        delaySeconds: input.delaySeconds,
-        mainMessage: input.mainMessage,
-        category: input.category,
-      })),
+      .mutation(({ input }) => db.createOrUpdateInstanceSettings(input.instanceId, input)),
   }),
 
   queueModes: router({
-    get: protectedProcedure
+    list: publicProcedure
       .input(z.object({ instanceId: z.number() }))
       .query(({ input }) => db.getQueueModes(input.instanceId)),
-    
-    set: protectedProcedure
-      .input(z.object({ instanceId: z.number(), modes: z.array(z.string()) }))
-      .mutation(({ input }) => db.setQueueModes(input.instanceId, input.modes)),
   }),
 
   organizations: router({
-    list: protectedProcedure
+    list: publicProcedure
       .input(z.object({ instanceId: z.number() }))
       .query(({ input }) => db.getOrganizations(input.instanceId)),
-    
-    update: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        enabled: z.number().optional(),
-        customMessage: z.string().optional(),
-      }))
-      .mutation(({ input }) => db.updateOrganization(input.id, {
-        enabled: input.enabled,
-        customMessage: input.customMessage,
-      })),
   }),
 
   statistics: router({
-    get: protectedProcedure
+    get: publicProcedure
       .input(z.object({ instanceId: z.number() }))
       .query(({ input }) => db.getStatistics(input.instanceId)),
     
-    update: protectedProcedure
+    update: publicProcedure
       .input(z.object({
         instanceId: z.number(),
         entries: z.number().optional(),
-        queues: z.number().optional(),
-        matches: z.number().optional(),
-        dms: z.number().optional(),
+        activeQueues: z.number().optional(),
+        matchesFound: z.number().optional(),
+        dmsSent: z.number().optional(),
         uptime: z.number().optional(),
       }))
-      .mutation(({ input }) => db.updateStatistics(input.instanceId, {
-        entries: input.entries,
-        queues: input.queues,
-        matches: input.matches,
-        dms: input.dms,
-        uptime: input.uptime,
-      })),
-    
-    reset: protectedProcedure
-      .input(z.object({ instanceId: z.number() }))
-      .mutation(({ input }) => db.resetStatistics(input.instanceId)),
-    
-    aggregated: protectedProcedure.query(({ ctx }) => db.getAggregatedStats(ctx.user.id)),
+      .mutation(({ input }) => db.updateStatistics(input.instanceId, input)),
   }),
 
   logs: router({
-    list: protectedProcedure
+    list: publicProcedure
       .input(z.object({ instanceId: z.number(), limit: z.number().default(100) }))
       .query(({ input }) => db.getInstanceLogs(input.instanceId, input.limit)),
     
-    add: protectedProcedure
+    add: publicProcedure
       .input(z.object({
         instanceId: z.number(),
         level: z.enum(["INFO", "SUCCESS", "WARNING", "ERROR"]),
@@ -145,7 +113,7 @@ export const appRouter = router({
       }))
       .mutation(({ input }) => db.addLog(input.instanceId, input.level, input.message)),
     
-    clear: protectedProcedure
+    clear: publicProcedure
       .input(z.object({ instanceId: z.number() }))
       .mutation(({ input }) => db.clearInstanceLogs(input.instanceId)),
   }),
