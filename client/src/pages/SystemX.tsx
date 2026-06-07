@@ -53,7 +53,7 @@ const styles = `
     transition: all 0.35s ease; position: relative; background: rgba(255,255,255,0.03); user-select: none;
   }
   .systemx-play:hover { transform: scale(1.06); box-shadow: 0 0 30px rgba(255,255,255,0.2); }
-  .systemx-play .icon-play { width: 0; height: 0; border-left: 32px solid #fff; border-top: 20px solid transparent; border-bottom: 20px solid transparent; margin-left: 8px; }
+  .systemx-play .icon-play { width: 0; height: 0; border-left: 32px solid #fff; border-top: 20px solid transparent; border-bottom: 20px solid transparent; margin-left: 8px; display: block; }
   .systemx-play .icon-stop { width: 26px; height: 26px; background: #ef4444; border-radius: 4px; display: none; animation: systemx-blink 1.2s infinite; }
   .systemx-play.ligado { border-color: #ef4444; box-shadow: 0 0 35px rgba(239,68,68,0.5); background: rgba(239,68,68,0.08); }
   .systemx-play.ligado .icon-play { display: none; }
@@ -94,10 +94,9 @@ export default function SystemX() {
       .catch(() => {});
   }, [activeBot]);
 
-  // Loop de atualização de Status e Logs
+  // Loop de atualização de Status e Logs (mais frequente)
   useEffect(() => {
     const interval = setInterval(() => {
-      // Status
       fetch(`/api/bot/status/${activeBot}`)
         .then(res => res.json())
         .then(data => {
@@ -106,29 +105,33 @@ export default function SystemX() {
         })
         .catch(() => {});
 
-      // Logs
       fetch(`/api/bot/logs/${activeBot}`)
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) setLogs(data);
         })
         .catch(() => {});
-    }, 3000);
+    }, 2000);
     return () => clearInterval(interval);
   }, [activeBot]);
 
   const toggleBot = async () => {
     const endpoint = isRunning ? 'stop' : 'start';
+    // Mudar estado local imediatamente para feedback visual rápido
+    const oldState = isRunning;
+    setIsRunning(!oldState);
+    
     try {
       const res = await fetch(`/api/bot/${endpoint}/${activeBot}`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
-        setIsRunning(!isRunning);
         toast.success(data.message);
       } else {
+        setIsRunning(oldState); // Reverter se der erro
         toast.error(data.message);
       }
     } catch (e) {
+      setIsRunning(oldState);
       toast.error("Erro ao comunicar com o servidor");
     }
   };
@@ -174,8 +177,8 @@ export default function SystemX() {
           <h1 className="systemx-title">SystemX</h1>
           <p className="systemx-subtitle">PAINEL DE CONTROLE</p>
           <div className="systemx-status">
-            <div className={`systemx-badge systemx-badge-green`}>
-              Conectado
+            <div className={`systemx-badge ${isRunning ? 'systemx-badge-green' : 'systemx-badge-red'}`}>
+              {isRunning ? 'Conectado' : 'Desconectado'}
             </div>
             <div className={`systemx-badge ${isRunning ? 'systemx-badge-green' : 'systemx-badge-red'}`}>
               {isRunning ? 'Rodando' : 'Parado'}
