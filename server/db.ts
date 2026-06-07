@@ -13,9 +13,10 @@ export async function getDb() {
     _dbConnecting = true;
     try {
       const client = postgres(process.env.DATABASE_URL, {
-        connect_timeout: 10,
+        connect_timeout: 5,
         idle_timeout: 30,
         max_lifetime: 60 * 60,
+        max: 1,
       });
       _db = drizzle(client);
       console.log("[Database] Connected successfully");
