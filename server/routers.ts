@@ -12,7 +12,7 @@ import * as botManager from "./botManager";
 const DEFAULT_USER = {
   id: 1,
   openId: "default-user",
-  name: "Admin",
+  name: process.env.OWNER_NAME || "Admin",
   email: "admin@discord-bot.local",
   loginMethod: "local",
   role: "admin" as const,
