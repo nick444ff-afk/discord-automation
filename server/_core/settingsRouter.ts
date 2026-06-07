@@ -44,6 +44,10 @@ export const settingsRouter = router({
     )
     .mutation(async ({ input }) => {
       try {
+        if (!input.tokens || input.tokens.trim() === "") {
+          throw new Error("Tokens são obrigatórios");
+        }
+
         const result = await db.createOrUpdateInstanceSettings(input.instanceId, {
           instanceId: input.instanceId,
           tokens: input.tokens,
@@ -57,12 +61,16 @@ export const settingsRouter = router({
           await db.setQueueModes(input.instanceId, [input.queueMode]);
         }
 
+        const tokenCount = input.tokens.split('\n').filter(t => t.trim()).length;
+        await db.addLog(input.instanceId, "SUCCESS", `[SISTEMA] Configuracoes salvas com sucesso! Tokens: ${tokenCount} | Delay: ${input.messageDelay}s | Categoria: ${input.categoryName}`);
+
         return {
           success: true,
           settings: result,
         };
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error saving settings:", error);
+        await db.addLog(input.instanceId, "ERROR", `[SISTEMA] Erro ao salvar configuracoes: ${error.message}`);
         throw error;
       }
     }),

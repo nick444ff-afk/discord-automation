@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "./trpc";
 import * as db from "../db";
+import * as botManager from "../botManager";
 
 export const instancesRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -14,18 +15,21 @@ export const instancesRouter = router({
   }),
 
   getStatus: protectedProcedure
-    .input(z.object({ instanceId: z.number() }))
-    .query(async ({ input }) => {
+    .input(z.object({ instanceId: z.number() }).or(z.object({ id: z.number() })))
+    .query(async ({ input: rawInput }) => {
+      const input = { instanceId: (rawInput as any).instanceId || (rawInput as any).id };
       try {
         const instance = await db.getInstanceById(input.instanceId);
         if (!instance) {
           throw new Error("Instance not found");
         }
+        const botStatus = botManager.getBotInstanceStatus(input.instanceId);
         return {
           id: instance.id,
           name: instance.name,
           status: instance.status,
-          uptime: instance.uptime,
+          uptime: botStatus.uptime || instance.uptime,
+          isRunning: botStatus.isRunning,
           createdAt: instance.createdAt,
           updatedAt: instance.updatedAt,
         };
@@ -36,26 +40,37 @@ export const instancesRouter = router({
     }),
 
   start: protectedProcedure
-    .input(z.object({ instanceId: z.number() }))
-    .mutation(async ({ input }) => {
+    .input(z.object({ instanceId: z.number() }).or(z.object({ id: z.number() })))
+    .mutation(async ({ input: rawInput }) => {
+      const input = { instanceId: (rawInput as any).instanceId || (rawInput as any).id };
       try {
-        // This would call the bot manager in a real scenario
-        await db.updateInstanceStatus(input.instanceId, "online");
-        return { success: true, message: "Instance started" };
-      } catch (error) {
+        const result = await botManager.startBotInstance(input.instanceId);
+        if (result.status === "success") {
+          await db.addLog(input.instanceId, "SUCCESS", `[SISTEMA] Bot iniciado com sucesso via painel.`);
+          return { success: true, message: result.message };
+        } else {
+          await db.addLog(input.instanceId, "ERROR", `[SISTEMA] Erro ao iniciar bot: ${result.message}`);
+          throw new Error(result.message);
+        }
+      } catch (error: any) {
         console.error("Error starting instance:", error);
         throw error;
       }
     }),
 
   stop: protectedProcedure
-    .input(z.object({ instanceId: z.number() }))
-    .mutation(async ({ input }) => {
+    .input(z.object({ instanceId: z.number() }).or(z.object({ id: z.number() })))
+    .mutation(async ({ input: rawInput }) => {
+      const input = { instanceId: (rawInput as any).instanceId || (rawInput as any).id };
       try {
-        // This would call the bot manager in a real scenario
-        await db.updateInstanceStatus(input.instanceId, "offline");
-        return { success: true, message: "Instance stopped" };
-      } catch (error) {
+        const result = await botManager.stopBotInstance(input.instanceId);
+        if (result.status === "success") {
+          await db.addLog(input.instanceId, "INFO", `[SISTEMA] Bot parado via painel.`);
+          return { success: true, message: result.message };
+        } else {
+          throw new Error(result.message);
+        }
+      } catch (error: any) {
         console.error("Error stopping instance:", error);
         throw error;
       }

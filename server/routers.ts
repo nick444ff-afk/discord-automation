@@ -1,6 +1,7 @@
 import { systemRouter } from "./_core/systemRouter";
 import { instancesRouter } from "./_core/instancesRouter";
 import { settingsRouter } from "./_core/settingsRouter";
+import { automationRouter } from "./_core/automationRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
@@ -14,6 +15,7 @@ export const appRouter = router({
   system: systemRouter,
   instances: instancesRouter,
   settings: settingsRouter,
+  automation: automationRouter,
 });
 
 export function registerBotApi(app: express.Express) {
