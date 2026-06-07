@@ -1,144 +1,57 @@
+import { Client, Message } from 'discord.js-selfbot-v13';
 import * as db from "./db";
 
-interface MessageWithButtons {
-  id: string;
-  channelId: string;
-  content: string;
-  components: ButtonComponent[];
-}
-
-interface ButtonComponent {
-  customId: string;
-  label: string;
-  style: number;
-}
-
-// Simular clique em botões
-export async function simulateButtonClick(
-  instanceId: number,
-  messageId: string,
-  buttonCustomId: string,
-  delay: number = 0
-): Promise<{ success: boolean; message: string }> {
+// Esta função seria chamada dentro do botManager quando uma mensagem é recebida
+export async function handleAutomation(client: Client, message: Message, settings: any, instanceId: number) {
   try {
-    if (delay > 0) {
-      await new Promise(res => setTimeout(res, delay * 1000));
+    // 1. Verificar se é uma mensagem de interesse (ex: tem botões ou é de um canal específico)
+    if (message.components.length > 0) {
+      // Lógica de clique automático se configurado
+      if (settings.delaySeconds > 0) {
+        await new Promise(res => setTimeout(res, settings.delaySeconds * 1000));
+      }
+      
+      // Tentar clicar no primeiro botão (exemplo)
+      for (const row of message.components) {
+        for (const component of row.components) {
+          if (component.type === 'BUTTON') {
+            try {
+              await message.clickButton(component.customId);
+              const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
+              await db.addLog(instanceId, "SUCCESS", `[${timestamp}] SUCCESS buttons     Botão "${component.label}" clicado em #${message.channel.id}`);
+              return;
+            } catch (err) {}
+          }
+        }
+      }
     }
 
-    const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-    const logMessage = `[${timestamp}] INFO  buttons      Botão clicado: ${buttonCustomId} (Mensagem: ${messageId})`;
-    await db.addLog(instanceId, "INFO", logMessage);
+    // 2. Envio de mensagem automática se configurado
+    if (settings.mainMessage && !message.author.bot) {
+       // Lógica de resposta ou envio periódico
+    }
 
-    return { success: true, message: "Botão clicado com sucesso" };
   } catch (error: any) {
-    const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-    await db.addLog(instanceId, "ERROR", `[${timestamp}] ERROR buttons     Erro ao clicar botão: ${error.message}`);
-    return { success: false, message: error.message };
+    console.error("Erro na automação:", error);
   }
 }
 
-// Enviar mensagem em canal com delay
-export async function sendMessageToChannel(
-  instanceId: number,
-  channelId: string,
-  message: string,
-  delay: number = 0,
-  mention?: string
-): Promise<{ success: boolean; message: string }> {
-  try {
-    if (delay > 0) {
-      await new Promise(res => setTimeout(res, delay * 1000));
-    }
-
-    const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-    let logContent = `[${timestamp}] INFO  messages     Mensagem enviada para #${channelId}`;
-    
-    if (mention) {
-      logContent += ` - Menção: @${mention}`;
-    }
-    
-    logContent += ` - Conteúdo: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`;
-    
-    await db.addLog(instanceId, "INFO", logContent);
-
-    return { success: true, message: "Mensagem enviada com sucesso" };
-  } catch (error: any) {
-    const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-    await db.addLog(instanceId, "ERROR", `[${timestamp}] ERROR messages    Erro ao enviar mensagem: ${error.message}`);
-    return { success: false, message: error.message };
+// Funções exportadas para o Router (usadas via Painel)
+export async function realClickButton(client: Client, messageId: string, channelId: string, buttonId: string) {
+  const channel = await client.channels.fetch(channelId);
+  if (channel?.isText()) {
+    const message = await channel.messages.fetch(messageId);
+    await message.clickButton(buttonId);
+    return true;
   }
+  return false;
 }
 
-// Enviar mensagem com delay customizado
-export async function sendDelayedMessage(
-  instanceId: number,
-  channelId: string,
-  message: string,
-  delaySeconds: number
-): Promise<{ success: boolean; message: string }> {
-  try {
-    const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-    const logMessage = `[${timestamp}] INFO  delay        Agendando mensagem com delay de ${delaySeconds}s para #${channelId}`;
-    await db.addLog(instanceId, "INFO", logMessage);
-
-    // Agendar envio
-    setTimeout(async () => {
-      await sendMessageToChannel(instanceId, channelId, message, 0);
-    }, delaySeconds * 1000);
-
-    return { success: true, message: `Mensagem agendada para ${delaySeconds}s` };
-  } catch (error: any) {
-    const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-    await db.addLog(instanceId, "ERROR", `[${timestamp}] ERROR delay       Erro ao agendar mensagem: ${error.message}`);
-    return { success: false, message: error.message };
+export async function realSendMessage(client: Client, channelId: string, content: string) {
+  const channel = await client.channels.fetch(channelId);
+  if (channel?.isText()) {
+    await channel.send(content);
+    return true;
   }
-}
-
-// Mencionar usuário em canal
-export async function mentionUserInChannel(
-  instanceId: number,
-  channelId: string,
-  userId: string,
-  delaySeconds: number = 0
-): Promise<{ success: boolean; message: string }> {
-  try {
-    if (delaySeconds > 0) {
-      await new Promise(res => setTimeout(res, delaySeconds * 1000));
-    }
-
-    const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-    const logMessage = `[${timestamp}] INFO  mentions     Usuário mencionado: <@${userId}> em #${channelId}`;
-    await db.addLog(instanceId, "INFO", logMessage);
-
-    return { success: true, message: "Usuário mencionado com sucesso" };
-  } catch (error: any) {
-    const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-    await db.addLog(instanceId, "ERROR", `[${timestamp}] ERROR mentions    Erro ao mencionar usuário: ${error.message}`);
-    return { success: false, message: error.message };
-  }
-}
-
-// Confirmar fila automaticamente
-export async function autoConfirmQueue(
-  instanceId: number,
-  channelId: string,
-  messageId: string,
-  confirmButtonCustomId: string,
-  delaySeconds: number = 0
-): Promise<{ success: boolean; message: string }> {
-  try {
-    if (delaySeconds > 0) {
-      await new Promise(res => setTimeout(res, delaySeconds * 1000));
-    }
-
-    const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-    const logMessage = `[${timestamp}] SUCCESS confirmacao Fila confirmada automaticamente em #${channelId}`;
-    await db.addLog(instanceId, "SUCCESS", logMessage);
-
-    return { success: true, message: "Fila confirmada com sucesso" };
-  } catch (error: any) {
-    const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-    await db.addLog(instanceId, "ERROR", `[${timestamp}] ERROR confirmacao Erro ao confirmar fila: ${error.message}`);
-    return { success: false, message: error.message };
-  }
+  return false;
 }
