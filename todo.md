@@ -37,5 +37,5 @@
 - [x] Configuração Docker para Railway
 - [x] Variáveis de ambiente para produção
 - [x] README.md com documentação completa
-- [ ] Build otimizado para produção
-- [ ] Push para GitHub com histórico de commits
+- [x] Build otimizado para produção
+- [x] Push para GitHub com histórico de commits
