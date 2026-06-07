@@ -1,5 +1,9 @@
 import { integer, text, timestamp, varchar, pgTable, pgEnum } from "drizzle-orm/pg-core";
 
+export const user_roleEnum = pgEnum("user_role", ['user', 'admin']);
+export const instance_statusEnum = pgEnum("instance_status", ['online', 'offline', 'error']);
+export const log_levelEnum = pgEnum("log_level", ['INFO', 'SUCCESS', 'WARNING', 'ERROR']);
+
 /**
  * Core user table backing auth flow.
  * Extend this file with additional tables as your product grows.
@@ -16,7 +20,7 @@ export const users = pgTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: pgEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: userRoleEnum("role").default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -35,7 +39,7 @@ export const instances = pgTable("instances", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("userId").notNull(),
   name: varchar("name", { length: 255 }).notNull(), // "BOT 1", "BOT 2", etc.
-  status: pgEnum("status", ["online", "offline", "error"]).default("offline").notNull(),
+  status: instanceStatusEnum("status").default("offline").notNull(),
   uptime: integer("uptime").default(0).notNull(), // in seconds
   processId: integer("processId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -120,7 +124,7 @@ export type InsertStatistics = typeof statistics.$inferInsert;
 export const logs = pgTable("logs", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   instanceId: integer("instanceId").notNull(),
-  level: pgEnum("level", ["INFO", "SUCCESS", "WARNING", "ERROR"]).notNull(),
+  level: logLevelEnum("level").notNull(),
   message: text("message").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
