@@ -14,6 +14,7 @@ import { InstanceSettings as InstanceSettingsType } from "@/types";
 interface InstanceSettingsProps {
   instanceId: number;
   settings?: InstanceSettingsType | null;
+  organizations?: string[];
 }
 
 const QUEUE_MODES = ["1x1", "2x2", "3x3", "4x4"];
