@@ -4,6 +4,8 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
+import { eq } from "drizzle-orm";
+import { getDb } from "./db";
 
 // Usuário padrão para acesso sem autenticação
 const DEFAULT_USER = {
@@ -32,7 +34,18 @@ export const appRouter = router({
   }),
 
   instances: router({
-    list: publicProcedure.query(() => db.getUserInstances(DEFAULT_USER.id)),
+    list: publicProcedure.query(async () => {
+      const instances = await db.getUserInstances(DEFAULT_USER.id);
+      
+      // Se não houver instâncias, criar padrão
+      if (instances.length === 0) {
+        const bot1 = await db.createInstance(DEFAULT_USER.id, "BOT 1");
+        const bot2 = await db.createInstance(DEFAULT_USER.id, "BOT 2");
+        return [bot1, bot2];
+      }
+      
+      return instances;
+    }),
     
     create: publicProcedure
       .input(z.object({ name: z.string().min(1) }))
