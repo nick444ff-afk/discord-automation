@@ -10,6 +10,8 @@ import { setupVite } from "./vite";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
+import { getDb } from "./db";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +36,17 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // Run migrations on startup
+  try {
+    console.log("[Migrations] Starting database migrations...");
+    const db = await getDb();
+    await migrate(db, { migrationsFolder: "./drizzle" });
+    console.log("[Migrations] Database migrations completed successfully");
+  } catch (error) {
+    console.error("[Migrations] Error running migrations:", error);
+    // Don't exit, continue with server startup
+  }
+
   const app = express();
   const server = createServer(app);
   
