@@ -8,33 +8,35 @@ import DashboardLayout from "./components/DashboardLayout";
 import Home from "./pages/Home";
 import Instances from "./pages/Instances";
 import Logs from "./pages/Logs";
+import Login from "./pages/Login";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"}>
+      <Route path="/login" component={Login} />
+      <Route path="/">
         {() => (
           <DashboardLayout>
             <Home />
           </DashboardLayout>
         )}
       </Route>
-      <Route path={"/instances"}>
+      <Route path="/instances">
         {() => (
           <DashboardLayout>
             <Instances />
           </DashboardLayout>
         )}
       </Route>
-      <Route path={"/logs"}>
+      <Route path="/logs">
         {() => (
           <DashboardLayout>
             <Logs />
           </DashboardLayout>
         )}
       </Route>
-      <Route path={"/404"} component={NotFound} />
+      <Route path="/404" component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
     </Switch>
