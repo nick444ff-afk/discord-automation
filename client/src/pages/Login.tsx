@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -11,25 +12,21 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const loginMutation = trpc.auth.loginLocal.useMutation();
+  const utils = trpc.useUtils();
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Simular login local - em produção, conectar a um backend real
-      if (username === "admin" && password === "admin123") {
-        // Criar token JWT simples
-        const token = btoa(JSON.stringify({ username, role: "admin", exp: Date.now() + 86400000 }));
-        localStorage.setItem("session_token", token);
-        localStorage.setItem("user_name", username);
-        
-        toast.success("Login realizado com sucesso!");
-        setLocation("/");
-      } else {
-        toast.error("Usuário ou senha inválidos");
-      }
-    } catch (error) {
-      toast.error("Erro ao fazer login");
+      await loginMutation.mutateAsync({ username, password });
+      // Invalidar cache de auth.me para atualizar o estado
+      await utils.auth.me.invalidate();
+      toast.success("Login realizado com sucesso!");
+      setLocation("/");
+    } catch (error: any) {
+      toast.error(error?.message || "Usuário ou senha inválidos");
       console.error(error);
     } finally {
       setLoading(false);

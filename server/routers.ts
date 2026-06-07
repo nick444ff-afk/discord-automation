@@ -10,6 +10,20 @@ export const appRouter = router({
   
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    
+    loginLocal: publicProcedure
+      .input(z.object({ username: z.string(), password: z.string() }))
+      .mutation(({ ctx, input }) => {
+        // Simple local auth for Railway
+        if (input.username === "admin" && input.password === "admin123") {
+          const token = btoa(JSON.stringify({ username: input.username, role: "admin", exp: Date.now() + 86400000 }));
+          const cookieOptions = getSessionCookieOptions(ctx.req);
+          ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: 86400000 });
+          return { success: true, token };
+        }
+        throw new Error("Invalid credentials");
+      }),
+    
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
