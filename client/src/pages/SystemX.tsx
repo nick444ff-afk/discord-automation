@@ -1,543 +1,299 @@
-import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import React, { useState, useEffect } from 'react';
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { useSocketIO } from "@/hooks/useSocketIO";
+
+// Estilos injetados para manter o visual original do usuário
+const styles = `
+  .systemx-body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(180deg, #050c1f, #0b1f47);
+    color: #e5e7eb;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .systemx-container {
+    max-width: 500px;
+    margin: auto;
+    padding: 15px;
+  }
+  .systemx-card {
+    background: linear-gradient(145deg, #0b1f47, #08142e);
+    border-radius: 22px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 40px rgba(0,0,0,0.5);
+    transition: border-color 0.4s ease, box-shadow 0.4s ease;
+  }
+  .systemx-card.bot-ligado {
+    border-color: rgba(239, 68, 68, 0.45);
+    box-shadow: 0 10px 40px rgba(239,68,68,0.25), inset 0 0 40px rgba(0,0,0,0.5);
+  }
+  .systemx-header { text-align: center; }
+  .systemx-logo {
+    width: 80px; height: 80px; margin: 0 auto 20px; border-radius: 22px;
+    background: linear-gradient(145deg, #1e3a8a, #1d4ed8);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; box-shadow: 0 0 25px rgba(59,130,246,0.4);
+  }
+  .systemx-logo img { width: 100%; height: 100%; object-fit: cover; }
+  .systemx-title { font-size: 26px; font-weight: 700; letter-spacing: 4px; }
+  .systemx-subtitle { opacity: 0.6; font-size: 13px; margin-top: 5px; }
+  .systemx-status { display: flex; justify-content: center; gap: 10px; margin-top: 15px; }
+  .systemx-badge { padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; transition: all 0.3s ease; }
+  .systemx-badge-green { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
+  .systemx-badge-red { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+  .systemx-bot-tabs { display: flex; background: #091a36; border-radius: 30px; padding: 6px; margin-top: 15px; }
+  .systemx-bot-tabs div { flex: 1; text-align: center; padding: 10px; border-radius: 20px; cursor: pointer; transition: all 0.3s ease; font-weight: 600; user-select: none; }
+  .systemx-bot-tabs .active { background: #e5e7eb; color: #000; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+  .systemx-play-wrapper { display: flex; flex-direction: column; align-items: center; margin: 30px 0 10px; }
+  .systemx-play {
+    width: 140px; height: 140px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.7);
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: all 0.35s ease; position: relative; background: rgba(255,255,255,0.03); user-select: none;
+  }
+  .systemx-play:hover { transform: scale(1.06); box-shadow: 0 0 30px rgba(255,255,255,0.2); }
+  .systemx-play .icon-play { width: 0; height: 0; border-left: 32px solid #fff; border-top: 20px solid transparent; border-bottom: 20px solid transparent; margin-left: 8px; }
+  .systemx-play .icon-stop { width: 26px; height: 26px; background: #ef4444; border-radius: 4px; display: none; animation: systemx-blink 1.2s infinite; }
+  .systemx-play.ligado { border-color: #ef4444; box-shadow: 0 0 35px rgba(239,68,68,0.5); background: rgba(239,68,68,0.08); }
+  .systemx-play.ligado .icon-play { display: none; }
+  .systemx-play.ligado .icon-stop { display: block; }
+  @keyframes systemx-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .systemx-stat { padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; }
+  .systemx-stat-title { font-size: 14px; opacity: 0.65; font-weight: 500; }
+  .systemx-stat-value { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+  .systemx-reset-btn { width: 100%; padding: 14px; border-radius: 14px; border: 1px solid rgba(255, 80, 80, 0.4); background: rgba(255, 80, 80, 0.08); color: #ff5a5a; font-weight: 600; cursor: pointer; }
+  .systemx-input, .systemx-textarea, .systemx-select { width: 100%; padding: 14px; margin-top: 6px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.07); background: #020617; color: #fff; }
+  .systemx-orgs-box { background: #020617; border-radius: 14px; padding: 10px 15px; max-height: 180px; overflow-y: auto; margin-top: 8px; border: 1px solid rgba(255,255,255,0.06); }
+  .systemx-org-item { display: flex; align-items: center; gap: 12px; padding: 9px 5px; cursor: pointer; }
+  .systemx-save-btn { width: 100%; padding: 15px; margin-top: 20px; border-radius: 12px; background: linear-gradient(135deg, #1d4ed8, #2563eb); color: #fff; font-weight: 700; cursor: pointer; }
+  .systemx-logs { background: #000; padding: 15px; border-radius: 12px; font-family: 'Courier New', monospace; font-size: 13px; height: 200px; overflow-y: auto; }
+  .systemx-clear-logs-btn { margin-top: 12px; width: 100%; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,90,90,0.35); background: rgba(255,90,90,0.1); color: #ff5a5a; font-weight: 700; cursor: pointer; }
+`;
 
 export default function SystemX() {
-  const [botAtivo, setBotAtivo] = useState("BOT1");
-  const [botLigado, setBotLigado] = useState(false);
-  const [uptimeSeconds, setUptimeSeconds] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Form state
-  const [tokens, setTokens] = useState("");
+  const [activeBot, setActiveBot] = useState<'BOT 1' | 'BOT 2'>('BOT 1');
+  const [tokens, setTokens] = useState('');
   const [rotation, setRotation] = useState(90);
-  const [category, setCategory] = useState("Mobile");
+  const [category, setCategory] = useState('Mobile');
   const [delay, setDelay] = useState(12);
-  const [mensagem, setMensagem] = useState("");
-  const [selectedOrgs, setSelectedOrgs] = useState({
-    COMPLEXO: true,
-    MORCEGO: true,
-    champions: false,
-    nexus: true,
-    venom: true,
-    yakuza: true,
-  });
-  const [selectedModos, setSelectedModos] = useState({
-    modo1x1: false,
-    modo2x2: true,
-    modo3x3: false,
-    modo4x4: true,
+  const [mensagem, setMensagem] = useState('');
+  const [selectedOrgs, setSelectedOrgs] = useState<Record<string, boolean>>({
+    COMPLEXO: true, MORCEGO: true, champions: false, nexus: true, venom: true, yakuza: true
   });
 
-  // Stats state
-  const [stats, setStats] = useState({
-    entradas: 0,
-    naFila: 0,
-    partidas: 0,
-    dms: 0,
-    uptime: "00:00:00",
-  });
-
-  const [logs, setLogs] = useState<Array<{ time: string; level: string; message: string }>>([]);
-  const [conexaoStatus, setConexaoStatus] = useState("Desconectado");
-  const [botStatus, setBotStatus] = useState("Parado");
-
-  // Get instances
+  // tRPC Hooks
   const { data: instances } = trpc.instances.list.useQuery();
-  const currentInstance = instances?.find((i) => i.name === botAtivo);
+  const currentInstance = instances?.find(i => i.name === activeBot);
+  const instanceId = currentInstance?.id;
 
-  // Get settings
+  const { data: status } = trpc.instances.getStatus.useQuery(
+    { id: instanceId! },
+    { enabled: !!instanceId, refetchInterval: 3000 }
+  );
+
+  const { data: stats } = trpc.statistics.get.useQuery(
+    { instanceId: instanceId! },
+    { enabled: !!instanceId, refetchInterval: 3000 }
+  );
+
+  const { data: dbLogs } = trpc.logs.list.useQuery(
+    { instanceId: instanceId!, limit: 50 },
+    { enabled: !!instanceId, refetchInterval: 2000 }
+  );
+
   const { data: settings } = trpc.settings.get.useQuery(
-    { instanceId: currentInstance?.id || 0 },
-    { enabled: !!currentInstance?.id }
+    { instanceId: instanceId! },
+    { enabled: !!instanceId }
   );
 
-  // Get statistics
-  const { data: statistics } = trpc.statistics.get.useQuery(
-    { instanceId: currentInstance?.id || 0 },
-    { enabled: !!currentInstance?.id }
-  );
-
-  // Get logs
-  const { data: instanceLogs } = trpc.logs.list.useQuery(
-    { instanceId: currentInstance?.id || 0, limit: 100 },
-    { enabled: !!currentInstance?.id }
-  );
-
-  // Socket IO for real-time updates
-  const { logs: socketLogs } = useSocketIO(currentInstance?.id || 0);
-
-  // Mutations
-  const updateStatusMutation = trpc.instances.updateStatus.useMutation();
-  const updateStatsMutation = trpc.statistics.update.useMutation();
+  const startMutation = trpc.instances.start.useMutation();
+  const stopMutation = trpc.instances.stop.useMutation();
   const saveSettingsMutation = trpc.settings.save.useMutation();
-  const addLogMutation = trpc.logs.add.useMutation();
   const clearLogsMutation = trpc.logs.clear.useMutation();
+  const resetStatsMutation = trpc.statistics.update.useMutation();
 
-  // Update uptime
+  // Carregar configurações do banco
   useEffect(() => {
-    if (!botLigado) return;
-
-    const interval = setInterval(() => {
-      setUptimeSeconds((prev) => prev + 1);
-      const hours = Math.floor(uptimeSeconds / 3600);
-      const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-      const seconds = uptimeSeconds % 60;
-      setStats((prev) => ({
-        ...prev,
-        uptime: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
-      }));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [botLigado, uptimeSeconds]);
-
-  // Update stats from API
-  useEffect(() => {
-    if (statistics) {
-      setStats((prev) => ({
-        ...prev,
-        entradas: statistics.entries,
-        naFila: statistics.queues,
-        partidas: statistics.matches,
-        dms: statistics.dms,
-      }));
-    }
-  }, [statistics]);
-
-  // Update logs
-  useEffect(() => {
-    if (instanceLogs) {
-      setLogs(
-        instanceLogs.map((log) => ({
-          time: new Date(log.createdAt).toLocaleTimeString(),
-          level: log.level,
-          message: log.message,
-        }))
-      );
-    }
-  }, [instanceLogs]);
-
-  // Check connection
-  useEffect(() => {
-    const checkConnection = async () => {
+    if (settings) {
+      setTokens(settings.tokens || '');
+      setRotation(settings.rotationMinutes || 90);
+      setCategory(settings.category || 'Mobile');
+      setDelay(settings.delaySeconds || 12);
+      setMensagem(settings.mainMessage || '');
+      
       try {
-        const response = await fetch("/api/trpc/instances.list");
-        if (response.ok) {
-          setConexaoStatus("Conectado");
-        } else {
-          setConexaoStatus("Desconectado");
-        }
-      } catch (e) {
-        setConexaoStatus("Desconectado");
-      }
-    };
-
-    checkConnection();
-    const interval = setInterval(checkConnection, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Update bot status
-  useEffect(() => {
-    if (botLigado) {
-      setBotStatus("Rodando");
-    } else {
-      setBotStatus("Parado");
+        const orgs = JSON.parse(settings.organizations || '{}');
+        if (Object.keys(orgs).length > 0) setSelectedOrgs(orgs);
+      } catch (e) {}
     }
-  }, [botLigado]);
+  }, [settings]);
 
   const toggleBot = async () => {
-    if (!currentInstance) return;
-
+    if (!instanceId) return;
     try {
-      if (botLigado) {
-        // Stop bot
-        setBotLigado(false);
-        await updateStatusMutation.mutateAsync({
-          id: currentInstance.id,
-          status: "offline",
-        });
-        addLogMutation.mutate({
-          instanceId: currentInstance.id,
-          level: "INFO",
-          message: `✅ ${botAtivo} desligado com sucesso.`,
-        });
-        toast.success(`${botAtivo} desligado!`);
+      if (status?.isRunning) {
+        await stopMutation.mutateAsync({ id: instanceId });
+        toast.success(`${activeBot} parado!`);
       } else {
-        // Start bot
-        setBotLigado(true);
-        await updateStatusMutation.mutateAsync({
-          id: currentInstance.id,
-          status: "online",
-        });
-        addLogMutation.mutate({
-          instanceId: currentInstance.id,
-          level: "SUCCESS",
-          message: `✅ ${botAtivo} iniciado com sucesso.`,
-        });
-        toast.success(`${botAtivo} ligado!`);
+        await startMutation.mutateAsync({ id: instanceId });
+        toast.success(`${activeBot} iniciado!`);
       }
-    } catch (error) {
-      toast.error("Erro ao alternar bot");
-      console.error(error);
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao controlar bot");
     }
-  };
-
-  const mudarBot = (bot: string) => {
-    if (bot === botAtivo) return;
-    setBotAtivo(bot);
-    setUptimeSeconds(0);
-    toast.info(`Trocado para ${bot}`);
   };
 
   const salvarConfiguracao = async () => {
-    if (!currentInstance) return;
-
-    setIsSaving(true);
+    if (!instanceId) return;
     try {
-      const selectedOrgsList = Object.entries(selectedOrgs)
-        .filter(([_, selected]) => selected)
-        .map(([org, _]) => org)
-        .join(",");
-
-      const selectedModosList = Object.entries(selectedModos)
-        .filter(([_, selected]) => selected)
-        .map(([modo, _]) => modo.replace("modo", ""))
-        .join(",");
-
       await saveSettingsMutation.mutateAsync({
-        instanceId: currentInstance.id,
+        instanceId,
         tokens,
         tokenRotation: true,
         messageDelay: delay,
         mainMessage: mensagem,
         secondaryMessage: "",
         categoryName: category,
-        organizations: selectedOrgsList,
-        queueMode: selectedModosList as any,
+        organizations: JSON.stringify(selectedOrgs),
+        queueMode: "2x2"
       });
-
-      addLogMutation.mutate({
-        instanceId: currentInstance.id,
-        level: "SUCCESS",
-        message: `✅ Configuração salva com sucesso.`,
-      });
-
-      toast.success("Configuração salva!");
-    } catch (error) {
+      toast.success("Configuração salva com sucesso!");
+    } catch (error: any) {
       toast.error("Erro ao salvar configuração");
-      console.error(error);
-    } finally {
-      setIsSaving(false);
     }
   };
 
   const resetStats = async () => {
-    if (!currentInstance) return;
-
-    try {
-      await updateStatsMutation.mutateAsync({
-        instanceId: currentInstance.id,
-        entries: 0,
-        activeQueues: 0,
-        matchesFound: 0,
-        dmsSent: 0,
-      });
-
-      setStats({
-        entradas: 0,
-        naFila: 0,
-        partidas: 0,
-        dms: 0,
-        uptime: "00:00:00",
-      });
-
-      toast.success("Estatísticas resetadas!");
-    } catch (error) {
-      toast.error("Erro ao resetar estatísticas");
-    }
+    if (!instanceId) return;
+    await resetStatsMutation.mutateAsync({
+      instanceId,
+      entries: 0,
+      activeQueues: 0,
+      matchesFound: 0,
+      dmsSent: 0,
+      uptime: 0
+    });
+    toast.success("Estatísticas resetadas!");
   };
 
   const limparLogs = async () => {
-    if (!currentInstance) return;
-
-    try {
-      await clearLogsMutation.mutateAsync({
-        instanceId: currentInstance.id,
-      });
-      setLogs([]);
-      toast.success("Logs limpos!");
-    } catch (error) {
-      toast.error("Erro ao limpar logs");
-    }
+    if (!instanceId) return;
+    await clearLogsMutation.mutateAsync({ instanceId });
+    toast.success("Logs limpos!");
   };
 
-  const addLog = (message: string, level: "INFO" | "SUCCESS" | "WARNING" | "ERROR" = "INFO") => {
-    if (!currentInstance) return;
-    addLogMutation.mutate({
-      instanceId: currentInstance.id,
-      level,
-      message,
-    });
+  const formatUptime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-4 space-y-6">
-      {/* HEADER */}
-      <div className="text-center space-y-4 mb-8">
-        <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center shadow-lg">
-          <img
-            src="https://i.imgur.com/llnJtbZ.png"
-            alt="Logo"
-            className="w-full h-full object-cover rounded-lg"
-          />
-        </div>
-        <h1 className="text-4xl font-bold tracking-widest">SystemX</h1>
-        <p className="text-sm opacity-60">PAINEL DE CONTROLE</p>
-
-        <div className="flex justify-center gap-3 flex-wrap">
-          <Badge
-            className={
-              conexaoStatus === "Conectado"
-                ? "bg-green-500/20 text-green-400 border-green-500/30"
-                : "bg-red-500/20 text-red-400 border-red-500/30"
-            }
-          >
-            {conexaoStatus}
-          </Badge>
-          <Badge
-            className={
-              botStatus === "Rodando"
-                ? "bg-green-500/20 text-green-400 border-green-500/30"
-                : "bg-red-500/20 text-red-400 border-red-500/30"
-            }
-          >
-            {botStatus}
-          </Badge>
-        </div>
-
-        {/* Bot Tabs */}
-        <div className="flex gap-2 justify-center">
-          {["BOT1", "BOT2"].map((bot) => (
-            <Button
-              key={bot}
-              onClick={() => mudarBot(bot)}
-              className={`px-6 ${
-                botAtivo === bot
-                  ? "bg-white text-black hover:bg-gray-100"
-                  : "bg-slate-700 hover:bg-slate-600 text-white"
-              }`}
-            >
-              {bot}
-            </Button>
-          ))}
-        </div>
-
-        <p className="text-xs opacity-65">INSTÂNCIA ATIVA: {botAtivo}</p>
-      </div>
-
-      {/* CONTROLE */}
-      <Card className={`p-6 border transition-all ${botLigado ? "border-red-500/45" : "border-slate-700"}`}>
-        <h3 className="text-lg font-semibold mb-6">Controle - {botAtivo}</h3>
-
-        <div className="flex flex-col items-center gap-4">
-          <button
-            onClick={toggleBot}
-            className={`w-32 h-32 rounded-full border-4 flex items-center justify-center transition-all ${
-              botLigado
-                ? "border-red-500 bg-red-500/10 shadow-lg shadow-red-500/30"
-                : "border-white/70 bg-white/5 hover:shadow-lg hover:shadow-white/20"
-            }`}
-          >
-            {botLigado ? (
-              <div className="w-8 h-8 bg-red-500 rounded animate-pulse"></div>
-            ) : (
-              <div className="w-0 h-0 border-l-8 border-r-0 border-t-5 border-b-5 border-l-white border-t-transparent border-b-transparent ml-2"></div>
-            )}
-          </button>
-          <p className={`text-sm transition-colors ${botLigado ? "text-red-400 font-semibold" : "opacity-65"}`}>
-            {botLigado ? `${botAtivo} em execução...` : "Clique para iniciar o bot"}
-          </p>
-        </div>
-      </Card>
-
-      {/* STATS */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card className="p-4 flex justify-between items-center">
-          <div className="text-sm opacity-65">Entradas</div>
-          <div className="text-2xl font-bold">{stats.entradas}</div>
-        </Card>
-        <Card className="p-4 flex justify-between items-center">
-          <div className="text-sm opacity-65">Na Fila</div>
-          <div className="text-2xl font-bold text-green-400">{stats.naFila}</div>
-        </Card>
-        <Card className="p-4 flex justify-between items-center">
-          <div className="text-sm opacity-65">Partidas</div>
-          <div className="text-2xl font-bold text-purple-400">{stats.partidas}</div>
-        </Card>
-        <Card className="p-4 flex justify-between items-center">
-          <div className="text-sm opacity-65">DMs</div>
-          <div className="text-2xl font-bold text-cyan-400">{stats.dms}</div>
-        </Card>
-        <Card className="p-4 flex justify-between items-center col-span-2">
-          <div className="text-sm opacity-65">Uptime</div>
-          <div className="text-2xl font-bold text-yellow-400">{stats.uptime}</div>
-        </Card>
-      </div>
-
-      {/* RESET STATS */}
-      <Button onClick={resetStats} className="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40">
-        RESETAR STATS
-      </Button>
-
-      {/* CONFIGURAÇÃO */}
-      <Card className="p-6 space-y-4">
-        <h3 className="text-lg font-semibold">Configuração</h3>
-
-        <div>
-          <label className="block text-sm font-medium mb-2">Tokens</label>
-          <textarea
-            value={tokens}
-            onChange={(e) => setTokens(e.target.value)}
-            placeholder="Cole seus tokens aqui (um por linha)"
-            rows={3}
-            className="w-full bg-slate-800 border border-slate-600 rounded p-3 text-white text-sm focus:outline-none focus:border-blue-500"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Rotação (min)</label>
-            <input
-              type="number"
-              value={rotation}
-              onChange={(e) => setRotation(Number(e.target.value))}
-              min="1"
-              className="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-            />
+    <div className="systemx-body">
+      <style>{styles}</style>
+      <div className="systemx-container">
+        {/* HEADER */}
+        <div className="systemx-card systemx-header">
+          <div className="systemx-logo">
+            <img src="https://i.imgur.com/llnJtbZ.png" alt="Logo" />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Delay (s)</label>
-            <input
-              type="number"
-              value={delay}
-              onChange={(e) => setDelay(Number(e.target.value))}
-              min="1"
-              className="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-            />
+          <h1 className="systemx-title">SystemX</h1>
+          <p className="systemx-subtitle">PAINEL DE CONTROLE</p>
+          <div className="systemx-status">
+            <div className={`systemx-badge ${instanceId ? 'systemx-badge-green' : 'systemx-badge-red'}`}>
+              {instanceId ? 'Conectado' : 'Desconectado'}
+            </div>
+            <div className={`systemx-badge ${status?.isRunning ? 'systemx-badge-green' : 'systemx-badge-red'}`}>
+              {status?.isRunning ? 'Rodando' : 'Parado'}
+            </div>
+          </div>
+          <div className="systemx-bot-tabs">
+            <div className={activeBot === 'BOT 1' ? 'active' : ''} onClick={() => setActiveBot('BOT 1')}>BOT1</div>
+            <div className={activeBot === 'BOT 2' ? 'active' : ''} onClick={() => setActiveBot('BOT 2')}>BOT2</div>
+          </div>
+          <p className="systemx-subtitle" style={{marginTop: '15px'}}>INSTÂNCIA ATIVA: {activeBot}</p>
+        </div>
+
+        {/* CONTROLE */}
+        <div className={`systemx-card ${status?.isRunning ? 'bot-ligado' : ''}`}>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+            <h3 style={{margin: 0}}>Controle - {activeBot}</h3>
+            <span style={{fontSize: '12px', padding: '4px 12px', borderRadius: '20px', background: 'rgba(34,211,238,0.12)', color: '#22d3ee'}}>{activeBot}</span>
+          </div>
+          <div className="systemx-play-wrapper">
+            <div className={`systemx-play ${status?.isRunning ? 'ligado' : ''}`} onClick={toggleBot}>
+              <div className="icon-play"></div>
+              <div className="icon-stop"></div>
+            </div>
+            <p className="systemx-subtitle" style={{color: status?.isRunning ? '#f87171' : '', fontWeight: status?.isRunning ? 'bold' : 'normal'}}>
+              {status?.isRunning ? `${activeBot} em execução...` : 'Clique para iniciar o bot'}
+            </p>
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-2">Categoria</label>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-          >
+        {/* STATS */}
+        {[
+          { label: 'Entradas', value: stats?.entries || 0, color: '' },
+          { label: 'Na Fila', value: stats?.queues || 0, color: '#22c55e' },
+          { label: 'Partidas', value: stats?.matches || 0, color: '#a855f7' },
+          { label: 'DMs', value: stats?.dms || 0, color: '#06b6d4' },
+          { label: 'Uptime', value: formatUptime(stats?.uptime || 0), color: '#facc15' }
+        ].map((s, i) => (
+          <div key={i} className="systemx-card systemx-stat">
+            <div className="systemx-stat-title">{s.label}</div>
+            <div className="systemx-stat-value" style={{color: s.color}}>{s.value}</div>
+          </div>
+        ))}
+
+        <div style={{marginBottom: '20px'}}>
+          <button className="systemx-reset-btn" onClick={resetStats}>RESETAR STATS</button>
+        </div>
+
+        {/* CONFIGURAÇÃO */}
+        <div className="systemx-card">
+          <h3>Configuração</h3>
+          <label style={{display: 'block', marginTop: '15px'}}>Tokens</label>
+          <textarea className="systemx-textarea" rows={3} value={tokens} onChange={(e) => setTokens(e.target.value)} placeholder="Cole seus tokens aqui (um por linha)"></textarea>
+          
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px'}}>
+            <div>
+              <label style={{display: 'block', marginTop: '15px'}}>Rotação</label>
+              <input type="number" className="systemx-input" value={rotation} onChange={(e) => setRotation(Number(e.target.value))} />
+            </div>
+            <div>
+              <label style={{display: 'block', marginTop: '15px'}}>Delay</label>
+              <input type="number" className="systemx-input" value={delay} onChange={(e) => setDelay(Number(e.target.value))} />
+            </div>
+          </div>
+
+          <label style={{display: 'block', marginTop: '15px'}}>Categoria</label>
+          <select className="systemx-select" value={category} onChange={(e) => setCategory(e.target.value)}>
             <option>Mobile</option>
             <option>Desktop</option>
           </select>
+
+          <label style={{display: 'block', marginTop: '15px'}}>Mensagem</label>
+          <input type="text" className="systemx-input" value={mensagem} onChange={(e) => setMensagem(e.target.value)} placeholder="Digite a mensagem" />
+
+          <button className="systemx-save-btn" onClick={salvarConfiguracao}>SALVAR CONFIGURAÇÃO</button>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-2">Mensagem</label>
-          <input
-            type="text"
-            value={mensagem}
-            onChange={(e) => setMensagem(e.target.value)}
-            placeholder="Digite a mensagem"
-            className="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-3">Modos</label>
-          <div className="bg-slate-800 border border-slate-600 rounded p-3 space-y-2">
-            {["modo1x1", "modo2x2", "modo3x3", "modo4x4"].map((modo) => (
-              <label key={modo} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedModos[modo as keyof typeof selectedModos]}
-                  onChange={(e) =>
-                    setSelectedModos((prev) => ({
-                      ...prev,
-                      [modo]: e.target.checked,
-                    }))
-                  }
-                  className="w-4 h-4 rounded accent-cyan-400"
-                />
-                <span className="text-sm">{modo.replace("modo", "")}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-3">Organizações</label>
-          <div className="bg-slate-800 border border-slate-600 rounded p-3 space-y-2 max-h-48 overflow-y-auto">
-            {Object.keys(selectedOrgs).map((org) => (
-              <label key={org} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedOrgs[org as keyof typeof selectedOrgs]}
-                  onChange={(e) =>
-                    setSelectedOrgs((prev) => ({
-                      ...prev,
-                      [org]: e.target.checked,
-                    }))
-                  }
-                  className="w-4 h-4 rounded accent-cyan-400"
-                />
-                <span className="text-sm">{org}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <Button
-          onClick={salvarConfiguracao}
-          disabled={isSaving}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3"
-        >
-          {isSaving ? "Salvando..." : "SALVAR CONFIGURAÇÃO"}
-        </Button>
-      </Card>
-
-      {/* LOGS */}
-      <Card className="p-6 space-y-4">
-        <h3 className="text-lg font-semibold">Logs</h3>
-        <div className="bg-black border border-slate-700 rounded p-4 h-64 overflow-y-auto font-mono text-xs space-y-1">
-          {logs.length === 0 ? (
-            <p className="text-slate-500">Nenhum log ainda...</p>
-          ) : (
-            logs.map((log, idx) => (
-              <div
-                key={idx}
-                className={
-                  log.level === "ERROR"
-                    ? "text-red-400"
-                    : log.level === "SUCCESS"
-                      ? "text-green-400"
-                      : log.level === "WARNING"
-                        ? "text-yellow-400"
-                        : "text-cyan-400"
-                }
-              >
-                <span className="text-slate-600">[{log.time}]</span> {log.message}
+        {/* LOGS */}
+        <div className="systemx-card">
+          <h3>Logs</h3>
+          <div className="systemx-logs">
+            {dbLogs?.map((log, i) => (
+              <div key={i} style={{color: log.level === 'ERROR' ? '#f87171' : log.level === 'SUCCESS' ? '#22c55e' : '#22d3ee'}}>
+                <span style={{color: '#4b5563'}}>[{new Date(log.createdAt).toLocaleTimeString()}]</span> {log.message}
               </div>
-            ))
-          )}
+            ))}
+          </div>
+          <button className="systemx-clear-logs-btn" onClick={limparLogs}>Limpar Logs</button>
         </div>
-        <Button onClick={limparLogs} className="w-full bg-slate-700 hover:bg-slate-600">
-          Limpar Logs
-        </Button>
-      </Card>
+      </div>
     </div>
   );
 }
