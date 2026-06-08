@@ -10,12 +10,11 @@ interface BotInstance {
   interval: NodeJS.Timeout | null;
 }
 
-// Armazenamento das instâncias de forma totalmente isolada
 const botInstances = new Map<number, BotInstance>();
 
-// Memória temporária para logs e status totalmente independente por ID
+// Memória temporária para logs e status (ESTADOS: 'offline', 'authenticating', 'scanning', 'running')
 export const memoryLogs = new Map<number, any[]>();
-export const memoryStatus = new Map<number, boolean>();
+export const botState = new Map<number, 'offline' | 'authenticating' | 'scanning' | 'running'>();
 
 function addMemoryLog(instanceId: number, level: string, message: string) {
     const logs = memoryLogs.get(instanceId) || [];
@@ -24,19 +23,72 @@ function addMemoryLog(instanceId: number, level: string, message: string) {
         message,
         createdAt: new Date().toISOString()
     });
-    memoryLogs.set(instanceId, logs.slice(0, 50));
+    memoryLogs.set(instanceId, logs.slice(0, 100)); // Aumentado para 100 logs
+}
+
+async function scanDiscordData(client: Client, instanceId: number) {
+    try {
+        botState.set(instanceId, 'scanning');
+        addMemoryLog(instanceId, "INFO", "🔍 Iniciando busca de servidores...");
+        
+        const guilds = await client.guilds.fetch();
+        addMemoryLog(instanceId, "INFO", `📊 Quantidade de servidores encontrados: ${guilds.size}`);
+
+        if (guilds.size === 0) {
+            addMemoryLog(instanceId, "WARNING", "⚠️ A conta não está em nenhum servidor.");
+            return;
+        }
+
+        for (const [guildId, baseGuild] of guilds) {
+            try {
+                const guild = await baseGuild.fetch();
+                addMemoryLog(instanceId, "SUCCESS", `🏢 Servidor: ${guild.name}`);
+
+                const channels = await guild.channels.fetch();
+                
+                // Categorias
+                const categories = channels.filter(c => c.type === 'GUILD_CATEGORY');
+                if (categories.size > 0) {
+                    addMemoryLog(instanceId, "INFO", `  📁 Categorias (${categories.size}): ${categories.map(c => c.name).join(', ')}`);
+                } else {
+                    addMemoryLog(instanceId, "INFO", "  📁 Nenhuma categoria encontrada neste servidor.");
+                }
+
+                // Canais de Texto
+                const textChannels = channels.filter(c => c.type === 'GUILD_TEXT');
+                if (textChannels.size > 0) {
+                    addMemoryLog(instanceId, "INFO", `  💬 Canais de Texto (${textChannels.size}): ${textChannels.map(c => c.name).join(', ')}`);
+                } else {
+                    addMemoryLog(instanceId, "INFO", "  💬 Nenhum canal de texto encontrado.");
+                }
+
+                // Tópicos (Threads)
+                const threads = await guild.channels.fetchActiveThreads();
+                if (threads.threads.size > 0) {
+                    addMemoryLog(instanceId, "INFO", `  🧵 Tópicos Ativos (${threads.threads.size}): ${threads.threads.map(t => t.name).join(', ')}`);
+                } else {
+                    addMemoryLog(instanceId, "INFO", "  🧵 Nenhum tópico ativo encontrado.");
+                }
+
+            } catch (guildErr: any) {
+                addMemoryLog(instanceId, "ERROR", `❌ Erro ao escanear servidor ${guildId}: ${guildErr.message}`);
+            }
+        }
+
+        addMemoryLog(instanceId, "SUCCESS", "✅ Escaneamento concluído com sucesso!");
+        botState.set(instanceId, 'running');
+    } catch (err: any) {
+        addMemoryLog(instanceId, "ERROR", `❌ Erro crítico no escaneamento: ${err.message}`);
+        botState.set(instanceId, 'running'); // Continua rodando mesmo se o scan falhar
+    }
 }
 
 export async function startBotInstance(instanceId: number, botName: string) {
   try {
-    // Resetar status de erro anterior e dar feedback imediato
-    memoryStatus.set(instanceId, true);
-    addMemoryLog(instanceId, "INFO", `Iniciando ${botName}...`);
+    botState.set(instanceId, 'authenticating');
+    addMemoryLog(instanceId, "INFO", `🚀 Início da autenticação para ${botName}...`);
 
-    // Tentar pegar configurações locais (BOT1 ou BOT2)
     let settings = await getSettings(botName);
-    
-    // Se não tiver local, tenta no banco apenas para essa instância
     if (!settings) {
         try {
             const dbSettings = await db.getInstanceSettings(instanceId);
@@ -53,21 +105,18 @@ export async function startBotInstance(instanceId: number, botName: string) {
     }
 
     if (!settings || !settings.tokens || settings.tokens.trim() === "") {
-      memoryStatus.set(instanceId, false);
-      addMemoryLog(instanceId, "ERROR", "Nenhum token configurado para este bot.");
+      botState.set(instanceId, 'offline');
+      addMemoryLog(instanceId, "ERROR", "❌ Nenhum token configurado para este bot.");
       return { status: "error", message: "Token não encontrado." };
     }
 
-    // Pegar apenas o primeiro token da lista desta instância
     const token = settings.tokens.split(/[\n,]+/)[0]?.trim();
-
     if (!token) {
-      memoryStatus.set(instanceId, false);
-      addMemoryLog(instanceId, "ERROR", "Token inválido.");
+      botState.set(instanceId, 'offline');
+      addMemoryLog(instanceId, "ERROR", "❌ Token inválido.");
       return { status: "error", message: "Token inválido." };
     }
 
-    // Verificar se já existe uma instância rodando PARA ESTE ID e parar se necessário
     let existingInstance = botInstances.get(instanceId);
     if (existingInstance?.isRunning) {
         return { status: "error", message: "Este bot já está rodando." };
@@ -77,9 +126,8 @@ export async function startBotInstance(instanceId: number, botName: string) {
     
     return new Promise<{status: string, message: string}>((resolve) => {
       client.on('ready', async () => {
-        const logMsg = `✓ Logado como @${client.user?.username}`;
-        addMemoryLog(instanceId, "SUCCESS", logMsg);
-        db.addLog(instanceId, "SUCCESS", logMsg).catch(() => {});
+        addMemoryLog(instanceId, "SUCCESS", "🔑 Token validado com sucesso!");
+        addMemoryLog(instanceId, "SUCCESS", `👤 Logado como @${client.user?.username}`);
         
         const interval = setInterval(() => {
           const inst = botInstances.get(instanceId);
@@ -97,36 +145,40 @@ export async function startBotInstance(instanceId: number, botName: string) {
           interval: interval
         });
 
-        memoryStatus.set(instanceId, true);
         db.updateInstanceStatus(instanceId, "online").catch(() => {});
+        
+        // Iniciar escaneamento
+        scanDiscordData(client, instanceId).catch(console.error);
+        
         resolve({ status: "success", message: `Bot iniciado com sucesso!` });
       });
 
       client.login(token).catch((err) => {
-        const errorMsg = `✕ Erro: ${err.message}`;
+        const errorMsg = `❌ Falha na API do Discord: ${err.message}`;
         addMemoryLog(instanceId, "ERROR", errorMsg);
-        memoryStatus.set(instanceId, false);
+        botState.set(instanceId, 'offline');
         resolve({ status: "error", message: err.message });
       });
 
-      // Timeout independente
       setTimeout(() => {
-          if (!botInstances.has(instanceId)) {
-              memoryStatus.set(instanceId, false);
+          if (botState.get(instanceId) === 'authenticating') {
+              botState.set(instanceId, 'offline');
+              addMemoryLog(instanceId, "ERROR", "❌ Tempo de login excedido (Timeout).");
               resolve({ status: "error", message: "Tempo de login excedido" });
           }
       }, 30000);
     });
 
   } catch (error: any) {
-    memoryStatus.set(instanceId, false);
+    botState.set(instanceId, 'offline');
+    addMemoryLog(instanceId, "ERROR", `❌ Erro inesperado: ${error.message}`);
     return { status: "error", message: error.message };
   }
 }
 
 export async function stopBotInstance(instanceId: number) {
   const instance = botInstances.get(instanceId);
-  memoryStatus.set(instanceId, false);
+  botState.set(instanceId, 'offline');
   
   if (instance) {
     if (instance.interval) clearInterval(instance.interval);
@@ -134,16 +186,17 @@ export async function stopBotInstance(instanceId: number) {
     botInstances.delete(instanceId);
   }
   
-  addMemoryLog(instanceId, "INFO", "Bot parado.");
+  addMemoryLog(instanceId, "INFO", "🛑 Bot parado pelo usuário.");
   db.updateInstanceStatus(instanceId, "offline").catch(() => {});
   return { status: "success", message: "Bot parado" };
 }
 
 export function getBotInstanceStatus(instanceId: number) {
-  const isRunning = memoryStatus.get(instanceId) || false;
+  const state = botState.get(instanceId) || 'offline';
   const instance = botInstances.get(instanceId);
   return {
-    isRunning: isRunning,
+    state,
+    isRunning: state !== 'offline',
     uptime: instance?.uptimeSeconds || 0
   };
 }

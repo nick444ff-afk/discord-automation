@@ -38,9 +38,9 @@ export function registerBotApi(app: express.Express) {
         }
       } catch (e) {}
       
-      res.json({ isRunning: status.isRunning, stats });
+      res.json({ isRunning: status.isRunning, state: status.state, stats });
     } catch (e) {
-      res.json({ isRunning: false, stats: { entries:0, queues:0, matches:0, dms:0, uptime: "00:00:00" } });
+      res.json({ isRunning: false, state: 'offline', stats: { entries:0, queues:0, matches:0, dms:0, uptime: "00:00:00" } });
     }
   });
 
@@ -80,13 +80,11 @@ export function registerBotApi(app: express.Express) {
     try {
       await saveSettings(botName, settings);
       
-      // LOG DE SALVAMENTO IMEDIATO
       const logMsg = "✓ CONFIGURAÇÃO SALVA!";
       const logs = botManager.memoryLogs.get(instanceId) || [];
       logs.unshift({ level: "SUCCESS", message: logMsg, createdAt: new Date().toISOString() });
-      botManager.memoryLogs.set(instanceId, logs.slice(0, 50));
+      botManager.memoryLogs.set(instanceId, logs.slice(0, 100));
       
-      // Sincronizar banco em background
       db.addLog(instanceId, "SUCCESS", logMsg).catch(() => {});
       db.getUserInstances(DEFAULT_USER.id).then(async (instances) => {
         let instance = instances.find(i => i.name.replace(/\s+/g, "") === botName);
@@ -105,7 +103,6 @@ export function registerBotApi(app: express.Express) {
     try {
       const botName = req.params.name;
       const instanceId = botName === "BOT1" ? 1 : 2;
-      // Iniciar de forma assíncrona para não travar a requisição HTTP
       botManager.startBotInstance(instanceId, botName).catch(console.error);
       res.json({ success: true, message: "Iniciando..." });
     } catch (e: any) {
