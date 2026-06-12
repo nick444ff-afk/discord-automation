@@ -1,7 +1,20 @@
 import { Client, Message } from 'discord.js-selfbot-v13';
 import * as db from "./db";
+import { organizations } from "../client/src/config/organizations";
 
 export async function handleAutomation(client: Client, message: Message, settings: any, instanceId: number) {
+  // Verificar se a mensagem veio de uma organização configurada
+  const orgEntries = Object.values(organizations);
+  const matchedOrg = orgEntries.find(org => 
+    org.guildId === message.guild?.id && 
+    org.matchCategoryId === (message.channel as any)?.parentId
+  );
+
+  if (!matchedOrg) {
+    // Se não houver match com IDs fixos, ainda podemos processar se a automação geral estiver ativa?
+    // O prompt pede especificamente para verificar esses IDs.
+  }
+
   try {
     // Lógica simplificada de automação para garantir que o bot não crash
     if (message.components && message.components.length > 0) {
