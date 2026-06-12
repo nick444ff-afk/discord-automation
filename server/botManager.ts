@@ -160,13 +160,7 @@ export async function startBotInstance(instanceId: number, botName: string) {
         resolve({ status: "error", message: err.message });
       });
 
-      setTimeout(() => {
-          if (botState.get(instanceId) === 'authenticating') {
-              botState.set(instanceId, 'offline');
-              addMemoryLog(instanceId, "ERROR", "❌ Tempo de login excedido (Timeout).");
-              resolve({ status: "error", message: "Tempo de login excedido" });
-          }
-      }, 30000);
+      // Timeout de 30 segundos removido a pedido do usuário
     });
 
   } catch (error: any) {
