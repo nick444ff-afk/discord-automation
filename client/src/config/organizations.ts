@@ -1,19 +1,15 @@
 export const organizations = {
-  BOUNTY: {
-    guildId: "ID_DA_GUILD_BOUNTY",
-    matchCategoryId: "ID_DA_CATEGORIA_BOUNTY"
+  Brasil: {
+    guildId: "1355334564213555231"
   },
-  MOVI: {
-    guildId: "ID_DA_GUILD_MOVI",
-    matchCategoryId: "ID_DA_CATEGORIA_MOVI"
+  Slash: {
+    guildId: "1244372570200080495"
   },
-  HOLANDA: {
-    guildId: "ID_DA_GUILD_HOLANDA",
-    matchCategoryId: "ID_DA_CATEGORIA_HOLANDA"
+  Farm: {
+    guildId: "1213981583779037234"
   },
-  STARS: {
-    guildId: "ID_DA_GUILD_STARS",
-    matchCategoryId: "ID_DA_CATEGORIA_STARS"
+  Romenia: {
+    guildId: "1425935863732244542"
   }
 };
 

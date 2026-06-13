@@ -4,26 +4,40 @@ import { organizations } from "../client/src/config/organizations";
 
 export async function handleAutomation(client: Client, message: Message, settings: any, instanceId: number) {
   // Obter as orgs selecionadas para esta instância
-  const selectedOrgsNames = settings.selectedOrgs || [];
+  let selectedOrgsNames = settings.selectedOrgs || [];
+  if (typeof selectedOrgsNames === 'string') {
+    try {
+      selectedOrgsNames = JSON.parse(selectedOrgsNames);
+    } catch (e) {
+      selectedOrgsNames = [];
+    }
+  }
   
   // Filtrar as orgs do código apenas pelas que foram selecionadas no painel
   const filteredOrgs = Object.entries(organizations)
-    .filter(([name]) => selectedOrgsNames.includes(name))
-    .map(([_, org]) => org);
+    .filter(([name]) => selectedOrgsNames.includes(name));
 
   // Verificar se a mensagem veio de uma organização configurada e SELECIONADA
-  const matchedOrg = filteredOrgs.find(org => 
-    org.guildId === message.guild?.id && 
-    org.matchCategoryId === (message.channel as any)?.parentId
+  const matchedOrgEntry = filteredOrgs.find(([_, org]) => 
+    org.guildId === message.guild?.id
   );
 
-  if (!matchedOrg) {
-    // Se não houver match com as orgs selecionadas, ignoramos a automação
+  if (!matchedOrgEntry) {
+    return;
+  }
+
+  // Se encontrou a org, agora verificamos se a categoria do canal bate com a configurada no painel
+  const channel = message.channel as any;
+  const categoryName = channel.parent?.name?.toLowerCase() || "";
+  const targetCategory = (settings.category || "Mobile").toLowerCase();
+
+  // Verifica se o nome da categoria contém o termo selecionado (ex: "mobile")
+  if (!categoryName.includes(targetCategory)) {
     return;
   }
 
   try {
-    // Lógica simplificada de automação para garantir que o bot não crash
+    // Lógica de automação
     if (message.components && message.components.length > 0) {
       const timestamp = new Date().toLocaleTimeString();
       

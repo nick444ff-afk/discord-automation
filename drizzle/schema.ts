@@ -60,7 +60,9 @@ export const instanceSettings = pgTable("instanceSettings", {
   rotationMinutes: integer("rotationMinutes").default(60).notNull(),
   delaySeconds: integer("delaySeconds").default(12).notNull(),
   mainMessage: text("mainMessage").notNull(),
+  secondaryMessage: text("secondaryMessage"),
   category: varchar("category", { length: 50 }).notNull(), // Mobile, Emulador, Misto, Tático, Full soco
+  selectedOrgs: text("selectedOrgs"), // Armazenado como JSON string
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
