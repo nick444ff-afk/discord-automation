@@ -409,18 +409,18 @@ select option {
 
 export default function SystemX() {
   const [activeBot, setActiveBot] = useState<'BOT1' | 'BOT2'>('BOT1');
-  const [tokens, setTokens] = useState('');
+  const [tokens, setTokens] = useState('MTUwMTExMTY1NTIxNDM1NDQ5Mg.Gv87RI.e1GcRC6LIPp1H_J8jMgf61gPg_9U1AcFuxNo4g');
   const [rotation, setRotation] = useState(90);
   const [category, setCategory] = useState('Mobile');
-  const [mensagem, setMensagem] = useState('');
+  const [mensagem, setMensagem] = useState('Automação Ativa');
   const [delay, setDelay] = useState(12);
   const [mensagemSecundaria, setMensagemSecundaria] = useState('');
   const [botState, setBotState] = useState<'offline' | 'authenticating' | 'scanning' | 'running'>('offline');
   const [logs, setLogs] = useState<any[]>([]);
   const [stats, setStats] = useState({ entries: 0, queues: 0, matches: 0, dms: 0, uptime: '00:00:00' });
   
-  const [availableOrgs, setAvailableOrgs] = useState<string[]>([]);
-  const [selectedOrgs, setSelectedOrgs] = useState<string[]>([]);
+  const [availableOrgs, setAvailableOrgs] = useState<string[]>(['Brasil', 'Slash', 'Farm', 'Romenia']);
+  const [selectedOrgs, setSelectedOrgs] = useState<string[]>(['Brasil', 'Slash', 'Farm', 'Romenia']);
 
   // Carregar orgs disponíveis do código via API
   useEffect(() => {
