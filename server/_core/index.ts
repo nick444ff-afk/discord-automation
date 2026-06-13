@@ -58,7 +58,7 @@ async function startServer() {
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
-    const distPath = path.resolve(__dirname, "../../dist/public");
+    const distPath = path.resolve(__dirname, "./public");
     app.use(express.static(distPath));
     app.use("*", (req, res) => {
       if (req.originalUrl.startsWith("/api")) return res.status(404).end();
