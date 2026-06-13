@@ -408,6 +408,7 @@ select option {
 `;
 
 export default function SystemX() {
+  console.log("[SystemX] Component rendering...");
   const [activeBot, setActiveBot] = useState<'BOT1' | 'BOT2'>('BOT1');
   const [tokens, setTokens] = useState('MTUwMTExMTY1NTIxNDM1NDQ5Mg.Gv87RI.e1GcRC6LIPp1H_J8jMgf61gPg_9U1AcFuxNo4g');
   const [rotation, setRotation] = useState(90);
@@ -424,10 +425,14 @@ export default function SystemX() {
 
   // Carregar orgs disponíveis do código via API
   useEffect(() => {
+    console.log("[SystemX] Initializing organizations fetch...");
     fetch('/api/bot/organizations')
       .then(res => res.json())
-      .then(data => setAvailableOrgs(data))
-      .catch(err => console.error("Erro ao carregar orgs:", err));
+      .then(data => {
+        console.log("[SystemX] Organizations loaded:", data);
+        setAvailableOrgs(data);
+      })
+      .catch(err => console.error("[SystemX] Erro ao carregar orgs:", err));
   }, []);
 
   useEffect(() => {
