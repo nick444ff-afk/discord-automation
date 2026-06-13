@@ -62,12 +62,19 @@ async function startServer() {
     // Então o caminho relativo de dist/index.js para dist/public é ./public
     const distPath = path.resolve(process.cwd(), "dist", "public");
     console.log("Serving static files from:", distPath);
-    app.use(express.static(distPath));
+    
+    // Serve static files with caching
+    app.use(express.static(distPath, { index: false }));
+
     app.use("*", (req, res) => {
         if (req.originalUrl.startsWith("/api")) return res.status(404).end();
+        
         const indexPath = path.resolve(distPath, "index.html");
-        console.log("Sending index.html from:", indexPath);
-        res.sendFile(indexPath);
+        if (fs.existsSync(indexPath)) {
+            res.sendFile(indexPath);
+        } else {
+            res.status(404).send("Build artifacts not found. Please run build first.");
+        }
     });
   }
 
