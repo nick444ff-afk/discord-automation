@@ -58,8 +58,12 @@ async function startServer() {
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
-    const { serveStatic } = await import("./vite");
-    serveStatic(app);
+    const distPath = path.resolve(__dirname, "../../dist/public");
+    app.use(express.static(distPath));
+    app.use("*", (req, res) => {
+      if (req.originalUrl.startsWith("/api")) return res.status(404).end();
+      res.sendFile(path.resolve(distPath, "index.html"));
+    });
   }
 
   const preferredPort = parseInt(process.env.PORT || "3000");
