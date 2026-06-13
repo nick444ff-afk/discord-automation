@@ -2,15 +2,21 @@ import { defineConfig } from "vite";
 import path from "path";
 
 export default defineConfig({
+  root: path.resolve(import.meta.dirname, "client"),
   resolve: {
     alias: {
-      "@": path.resolve(import.meta.dirname, "client/src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
+      "@": path.resolve(import.meta.dirname, "src"),
+      "@shared": path.resolve(import.meta.dirname, "../shared"),
     },
   },
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: path.resolve(import.meta.dirname, "client/index.html"),
+      },
+    },
   },
   server: {
     host: true,
