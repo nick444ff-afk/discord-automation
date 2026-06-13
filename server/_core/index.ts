@@ -58,25 +58,8 @@ async function startServer() {
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
-    // No Railway, o build coloca os arquivos em dist/public
-    // O arquivo index.js fica em dist/index.js
-    // Então o caminho relativo de dist/index.js para dist/public é ./public
-    const distPath = path.resolve(process.cwd(), "dist", "public");
-    console.log("Serving static files from:", distPath);
-    
-    // Serve static files with caching
-    app.use(express.static(distPath, { index: false }));
-
-    app.use("*", (req, res) => {
-        if (req.originalUrl.startsWith("/api")) return res.status(404).end();
-        
-        const indexPath = path.resolve(distPath, "index.html");
-        if (fs.existsSync(indexPath)) {
-            res.sendFile(indexPath);
-        } else {
-            res.status(404).send("Build artifacts not found. Please run build first.");
-        }
-    });
+    const { serveStatic } = await import("./vite");
+    serveStatic(app);
   }
 
   const preferredPort = parseInt(process.env.PORT || "3000");
