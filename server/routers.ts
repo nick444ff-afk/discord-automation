@@ -8,6 +8,7 @@ import * as db from "./db";
 import * as botManager from "./botManager";
 import express from "express";
 import { saveSettings, getSettings } from "./localSettings";
+import { organizations } from "../client/src/config/organizations";
 
 const DEFAULT_USER = { id: 1, name: "Admin" };
 
@@ -44,6 +45,11 @@ export function registerBotApi(app: express.Express) {
     }
   });
 
+  // GET Orgs from code
+  app.get("/api/bot/organizations", (req, res) => {
+    res.json(Object.keys(organizations));
+  });
+
   // GET Config
   app.get("/api/bot/config/:name", async (req, res) => {
     try {
@@ -54,27 +60,32 @@ export function registerBotApi(app: express.Express) {
           tokens: localSettings.tokens,
           rotation: localSettings.rotationMinutes,
           category: localSettings.category,
-          mensagem: localSettings.mainMessage
+          mensagem: localSettings.mainMessage,
+          mensagemSecundaria: localSettings.secondaryMessage || "",
+          delay: localSettings.delaySeconds || 12,
+          selectedOrgs: localSettings.selectedOrgs || []
         });
       }
-      res.json({ tokens: "", rotation: 90, category: "Mobile", mensagem: "" });
+      res.json({ tokens: "", rotation: 90, category: "Mobile", mensagem: "", mensagemSecundaria: "", delay: 12, selectedOrgs: [] });
     } catch (e) {
-      res.json({ tokens: "", rotation: 90, category: "Mobile", mensagem: "" });
+      res.json({ tokens: "", rotation: 90, category: "Mobile", mensagem: "", mensagemSecundaria: "", delay: 12, selectedOrgs: [] });
     }
   });
 
   // POST Config
   app.post("/api/bot/config/:name", async (req, res) => {
-    const { tokens, rotation, category, mensagem } = req.body;
+    const { tokens, rotation, category, mensagem, mensagemSecundaria, delay, selectedOrgs } = req.body;
     const botName = req.params.name;
     const instanceId = botName === "BOT1" ? 1 : 2;
     
     const settings = {
       tokens: tokens || "",
       rotationMinutes: parseInt(rotation) || 90,
-      delaySeconds: 12,
+      delaySeconds: parseInt(delay) || 12,
       mainMessage: mensagem || "",
-      category: category || "Mobile"
+      secondaryMessage: mensagemSecundaria || "",
+      category: category || "Mobile",
+      selectedOrgs: selectedOrgs || []
     };
 
     try {

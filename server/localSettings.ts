@@ -13,7 +13,9 @@ export interface InstanceSettings {
     rotationMinutes: number;
     delaySeconds: number;
     mainMessage: string;
+    secondaryMessage?: string;
     category: string;
+    selectedOrgs?: string[];
 }
 
 export async function saveSettings(botName: string, settings: InstanceSettings) {

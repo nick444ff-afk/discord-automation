@@ -405,72 +405,6 @@ select option {
     border: 1px solid rgba(34,211,238,0.25);
     transition: all 0.3s;
 }
-.org-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 10px;
-}
-.org-action-btn {
-    padding: 8px 14px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    background: #1d4ed8;
-    color: #fff;
-    font-weight: 600;
-}
-
-.org-form {
-    margin-top: 12px;
-    padding: 10px;
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
-}
-
-.remove-form {
-    margin-top: 12px;
-    padding: 15px;
-    border: 1px solid rgba(239,68,68,0.4);
-    border-radius: 10px;
-    background: rgba(239,68,68,0.08);
-}
-
-.remove-form h4 {
-    margin: 0 0 12px 0;
-    color: #f87171;
-    font-size: 14px;
-}
-
-.remove-form .orgs-box {
-    background: rgba(20,10,10,0.5);
-    border-color: rgba(239,68,68,0.3);
-    margin-bottom: 12px;
-}
-
-.remove-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-}
-
-.remove-btn {
-    padding: 10px 16px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-}
-
-.remove-btn.cancel {
-    background: rgba(100,116,139,0.2);
-    color: #94a3b8;
-}
-
-.remove-btn.delete {
-    background: #ef4444;
-    color: #fff;
-}
 `;
 
 export default function SystemX() {
@@ -485,15 +419,15 @@ export default function SystemX() {
   const [logs, setLogs] = useState<any[]>([]);
   const [stats, setStats] = useState({ entries: 0, queues: 0, matches: 0, dms: 0, uptime: '00:00:00' });
   
-  const [orgs, setOrgs] = useState<any[]>([]);
-  const [showOrgForm, setShowOrgForm] = useState(false);
-  const [showRemoveForm, setShowRemoveForm] = useState(false);
-  const [novaOrg, setNovaOrg] = useState({ nome: '', id: '', catId: '' });
-  const [orgsParaRemover, setOrgsParaRemover] = useState<number[]>([]);
+  const [availableOrgs, setAvailableOrgs] = useState<string[]>([]);
+  const [selectedOrgs, setSelectedOrgs] = useState<string[]>([]);
 
+  // Carregar orgs disponíveis do código via API
   useEffect(() => {
-    const savedOrgs = localStorage.getItem('orgs');
-    if (savedOrgs) setOrgs(JSON.parse(savedOrgs));
+    fetch('/api/bot/organizations')
+      .then(res => res.json())
+      .then(data => setAvailableOrgs(data))
+      .catch(err => console.error("Erro ao carregar orgs:", err));
   }, []);
 
   useEffect(() => {
@@ -504,6 +438,9 @@ export default function SystemX() {
         setRotation(data.rotation || 90);
         setCategory(data.category || 'Mobile');
         setMensagem(data.mensagem || '');
+        setMensagemSecundaria(data.mensagemSecundaria || '');
+        setDelay(data.delay || 12);
+        setSelectedOrgs(data.selectedOrgs || []);
       });
   }, [activeBot]);
 
@@ -550,7 +487,15 @@ export default function SystemX() {
       const res = await fetch(`/api/bot/config/${activeBot}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tokens, rotation, category, mensagem })
+        body: JSON.stringify({ 
+          tokens, 
+          rotation, 
+          category, 
+          mensagem, 
+          mensagemSecundaria, 
+          delay, 
+          selectedOrgs 
+        })
       });
       const data = await res.json();
       if (data.success) {
@@ -573,24 +518,12 @@ export default function SystemX() {
     }
   };
 
-  const adicionarOrg = () => {
-    if (novaOrg.nome && novaOrg.id && novaOrg.catId) {
-      const updated = [...orgs, novaOrg];
-      setOrgs(updated);
-      localStorage.setItem('orgs', JSON.stringify(updated));
-      setNovaOrg({ nome: '', id: '', catId: '' });
-      setShowOrgForm(false);
-      toast.success("Org adicionada!");
-    }
-  };
-
-  const removerOrgs = () => {
-    const updated = orgs.filter((_, i) => !orgsParaRemover.includes(i));
-    setOrgs(updated);
-    localStorage.setItem('orgs', JSON.stringify(updated));
-    setOrgsParaRemover([]);
-    setShowRemoveForm(false);
-    toast.success("Orgs removidas!");
+  const toggleOrgSelection = (orgName: string) => {
+    setSelectedOrgs(prev => 
+      prev.includes(orgName) 
+        ? prev.filter(name => name !== orgName) 
+        : [...prev, orgName]
+    );
   };
 
   const getStatusBadge = () => {
@@ -658,51 +591,22 @@ export default function SystemX() {
             <option>Tático</option>
           </select>
 
-          <label>Selecionar Orgs</label>
+          <label>Selecionar Orgs (Carregadas do Código)</label>
           <div className="orgs-box">
-            {orgs.map((org, i) => (
+            {availableOrgs.map((orgName, i) => (
               <label key={i} className="org-item">
-                <input type="checkbox" />
-                <span>{org.nome}</span>
+                <input 
+                  type="checkbox" 
+                  checked={selectedOrgs.includes(orgName)}
+                  onChange={() => toggleOrgSelection(orgName)}
+                />
+                <span>{orgName}</span>
               </label>
             ))}
-          </div>
-          <div className="org-actions">
-            <button className="org-action-btn" onClick={() => {setShowOrgForm(!showOrgForm); setShowRemoveForm(false);}}>Adicionar</button>
-            <button className="org-action-btn" onClick={() => {setShowRemoveForm(!showRemoveForm); setShowOrgForm(false);}}>Remover</button>
+            {availableOrgs.length === 0 && <p style={{opacity: 0.5, fontSize: '13px'}}>Nenhuma org encontrada no código.</p>}
           </div>
 
-          {showOrgForm && (
-            <div className="org-form">
-              <label>Nome da Org</label><input value={novaOrg.nome} onChange={e => setNovaOrg({...novaOrg, nome: e.target.value})} />
-              <label>ID da Org</label><input value={novaOrg.id} onChange={e => setNovaOrg({...novaOrg, id: e.target.value})} />
-              <label>ID da Categoria</label><input value={novaOrg.catId} onChange={e => setNovaOrg({...novaOrg, catId: e.target.value})} />
-              <button className="org-action-btn" onClick={adicionarOrg} style={{marginTop: '10px'}}>Adicionar</button>
-            </div>
-          )}
-
-          {showRemoveForm && (
-            <div className="remove-form">
-              <h4>Selecione as Orgs para Remover</h4>
-              <div className="orgs-box">
-                {orgs.map((org, i) => (
-                  <label key={i} className="org-item">
-                    <input type="checkbox" checked={orgsParaRemover.includes(i)} onChange={e => {
-                      if (e.target.checked) setOrgsParaRemover([...orgsParaRemover, i]);
-                      else setOrgsParaRemover(orgsParaRemover.filter(idx => idx !== i));
-                    }} />
-                    <span>{org.nome}</span>
-                  </label>
-                ))}
-              </div>
-              <div className="remove-actions">
-                <button className="remove-btn cancel" onClick={() => setShowRemoveForm(false)}>Cancelar</button>
-                <button className="remove-btn delete" onClick={removerOrgs} disabled={orgsParaRemover.length === 0}>Remover</button>
-              </div>
-            </div>
-          )}
-
-          <label>Delay</label>
+          <label>Delay (segundos)</label>
           <input type="number" value={delay} onChange={e => setDelay(Number(e.target.value))} />
           <label>Mensagem</label>
           <input type="text" value={mensagem} onChange={e => setMensagem(e.target.value)} placeholder="Digite a mensagem" />

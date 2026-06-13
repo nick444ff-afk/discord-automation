@@ -98,7 +98,9 @@ export async function startBotInstance(instanceId: number, botName: string) {
                     rotationMinutes: dbSettings.rotationMinutes,
                     delaySeconds: dbSettings.delaySeconds,
                     mainMessage: dbSettings.mainMessage,
-                    category: dbSettings.category
+                    category: dbSettings.category,
+                    secondaryMessage: (dbSettings as any).secondaryMessage,
+                    selectedOrgs: (dbSettings as any).selectedOrgs
                 };
             }
         } catch (e) {}
@@ -149,6 +151,15 @@ export async function startBotInstance(instanceId: number, botName: string) {
         
         // Iniciar escaneamento
         scanDiscordData(client, instanceId).catch(console.error);
+
+        // Registrar evento de mensagem para automação
+        client.on('messageCreate', async (message) => {
+            const currentSettings = await getSettings(botName);
+            if (currentSettings) {
+                const { handleAutomation } = await import("./discordBotHandler");
+                handleAutomation(client, message, currentSettings, instanceId).catch(console.error);
+            }
+        });
         
         resolve({ status: "success", message: `Bot iniciado com sucesso!` });
       });

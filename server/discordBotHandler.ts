@@ -3,16 +3,23 @@ import * as db from "./db";
 import { organizations } from "../client/src/config/organizations";
 
 export async function handleAutomation(client: Client, message: Message, settings: any, instanceId: number) {
-  // Verificar se a mensagem veio de uma organização configurada
-  const orgEntries = Object.values(organizations);
-  const matchedOrg = orgEntries.find(org => 
+  // Obter as orgs selecionadas para esta instância
+  const selectedOrgsNames = settings.selectedOrgs || [];
+  
+  // Filtrar as orgs do código apenas pelas que foram selecionadas no painel
+  const filteredOrgs = Object.entries(organizations)
+    .filter(([name]) => selectedOrgsNames.includes(name))
+    .map(([_, org]) => org);
+
+  // Verificar se a mensagem veio de uma organização configurada e SELECIONADA
+  const matchedOrg = filteredOrgs.find(org => 
     org.guildId === message.guild?.id && 
     org.matchCategoryId === (message.channel as any)?.parentId
   );
 
   if (!matchedOrg) {
-    // Se não houver match com IDs fixos, ainda podemos processar se a automação geral estiver ativa?
-    // O prompt pede especificamente para verificar esses IDs.
+    // Se não houver match com as orgs selecionadas, ignoramos a automação
+    return;
   }
 
   try {
