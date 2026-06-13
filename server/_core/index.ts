@@ -9,6 +9,7 @@ import { createContext } from "./context";
 import { setupVite } from "./vite";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 
 
