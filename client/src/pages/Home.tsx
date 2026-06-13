@@ -1,12 +1,5 @@
-import { useEffect } from "react";
-import { useLocation } from "wouter";
+import SystemX from "./SystemX";
 
 export default function Home() {
-  const [, setLocation] = useLocation();
-
-  useEffect(() => {
-    setLocation("/systemx");
-  }, [setLocation]);
-
-  return null;
+  return <SystemX />;
 }
