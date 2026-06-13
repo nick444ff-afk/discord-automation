@@ -60,12 +60,14 @@ async function startServer() {
     // No Railway, o build coloca os arquivos em dist/public
     // O arquivo index.js fica em dist/index.js
     // Então o caminho relativo de dist/index.js para dist/public é ./public
-    const distPath = path.resolve(__dirname, "public");
+    const distPath = path.resolve(process.cwd(), "dist", "public");
     console.log("Serving static files from:", distPath);
     app.use(express.static(distPath));
     app.use("*", (req, res) => {
         if (req.originalUrl.startsWith("/api")) return res.status(404).end();
-        res.sendFile(path.resolve(distPath, "index.html"));
+        const indexPath = path.resolve(distPath, "index.html");
+        console.log("Sending index.html from:", indexPath);
+        res.sendFile(indexPath);
     });
   }
 
