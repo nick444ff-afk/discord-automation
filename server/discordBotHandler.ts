@@ -35,42 +35,63 @@ export async function handleAutomation(client: Client, message: Message, setting
 
   try {
     processing.add(channel.id);
-    
-    // 4. Buscar mensagens com botões
-    const msgs = await channel.messages.fetch({ limit: 5 });
-    const targetMsg = msgs.find((m: any) => m.components?.some((row: any) => row.components.some((c: any) => c.type === 'BUTTON')));
+    const timestamp = new Date().toLocaleTimeString();
+
+    // 4. Buscar mensagens com botões (Escanear últimas 11 conforme backup)
+    const msgs = await channel.messages.fetch({ limit: 11 });
+    let targetMsg = null;
+
+    for (const msg of msgs.values()) {
+        if (!msg.components || msg.components.length === 0) continue;
+
+        // Concatenar todo o texto (conteúdo + embeds) para verificar se é uma mensagem válida
+        let fullText = msg.content || "";
+        for (const embed of msg.embeds) {
+            fullText += ` ${embed.title || ""} ${embed.description || ""}`;
+            if (embed.fields?.length) {
+                fullText += " " + embed.fields.map((f: any) => `${f.name}: ${f.value}`).join(" ");
+            }
+        }
+
+        // Se tiver botões e texto, consideramos válida (lógica simplificada do backup)
+        if (msg.components.length > 0) {
+            targetMsg = msg;
+            break;
+        }
+    }
     
     if (!targetMsg) return;
 
-    const timestamp = new Date().toLocaleTimeString();
-
-    // Lógica de prioridade de botões baseada no tipo (Mobile/Emu/Tático)
+    // Lógica de prioridade de botões baseada no backup
     let buttonToClick = null;
     const format = matchedMode.toLowerCase(); // 1x1, 2x2, etc
-    const type = targetCategory.toLowerCase(); // mobile, emulador, etc
+    const type = targetCategory.toLowerCase(); // mobile, emulador, tático, misto
 
     for (const row of targetMsg.components) {
       for (const component of row.components) {
         if (component.type === 'BUTTON') {
           const label = (component.label || "").toLowerCase();
+          // Ignorar botões de cancelamento
           if (["cancelar", "finalizar", "recusar", "fechar", "sair"].some(word => label.includes(word))) continue;
 
-          // Se for Tático, procura o subtipo no label
           if (type.includes("tático")) {
             if (label.includes("mobile") || label.includes("emulador")) {
                buttonToClick = component;
                break;
             }
-          } 
-          // Se for 1x1, procura Normal ou Infinito
-          else if (format === "1x1") {
-            if (label.includes("normal") || label.includes("infinito")) {
+          } else if (format === "1x1") {
+            if (label.includes("normal") || label.includes("infinito") || label.includes("gelo")) {
               buttonToClick = component;
               break;
             }
+          } else if (type.includes("misto")) {
+             // Lógica para misto (procurar botões com números de emuladores)
+             if (label.includes("emu") || label.includes("misto")) {
+                buttonToClick = component;
+                break;
+             }
           }
           
-          // Se não encontrou específico, pega o primeiro botão válido
           if (!buttonToClick) buttonToClick = component;
         }
       }
@@ -96,7 +117,6 @@ export async function handleAutomation(client: Client, message: Message, setting
             console.log(`[${timestamp}] Aguardando delay de ${settings.delaySeconds}s para enviar a mensagem...`);
             await new Promise(res => setTimeout(res, delayMensagem));
             
-            // Enviar mensagem SEM menções (conforme solicitado)
             await channel.send(settings.mainMessage).catch(console.error);
             
             const logMsg1 = `[${timestamp}] 📩 Mensagem enviada em #${channel.name}`;
@@ -109,7 +129,6 @@ export async function handleAutomation(client: Client, message: Message, setting
                 await db.addLog(instanceId, "SUCCESS", logMsg2).catch(() => {});
             }
             
-            // Incrementar estatísticas
             await db.updateStatistics(instanceId, { entries: 1, queues: 1 }).catch(() => {});
         }
       } catch (err: any) {
