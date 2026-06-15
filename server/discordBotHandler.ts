@@ -79,10 +79,9 @@ export async function handleAutomation(client: Client, message: Message, setting
 
     if (buttonToClick) {
       try {
-        // DELAY DO CLIQUE (Respeitando o delay programado no painel)
-        const delayMs = (settings.delaySeconds || 12) * 1000;
-        console.log(`[${timestamp}] Aguardando delay de ${settings.delaySeconds}s para clicar...`);
-        await new Promise(res => setTimeout(res, delayMs));
+        // 1. DELAY VARIÁVEL PARA O CLIQUE (2 a 3 segundos para evitar detecção)
+        const randomDelay = Math.floor(Math.random() * (3000 - 2000 + 1) + 2000);
+        await new Promise(res => setTimeout(res, randomDelay));
         
         await targetMsg.clickButton(buttonToClick.customId);
         
@@ -91,27 +90,14 @@ export async function handleAutomation(client: Client, message: Message, setting
         await db.addLog(instanceId, "SUCCESS", logClique).catch(() => {});
         console.log(logClique);
 
-        // 5. Envio de Mensagens Programadas (Após o clique)
+        // 2. DELAY PROGRAMADO ANTES DO ENVIO DA MENSAGEM (Ex: 12s)
         if (settings.mainMessage) {
-            // Pequeno intervalo de segurança após o clique para a mensagem não bugar
-            await new Promise(res => setTimeout(res, 1500));
+            const delayMensagem = (settings.delaySeconds || 12) * 1000;
+            console.log(`[${timestamp}] Aguardando delay de ${settings.delaySeconds}s para enviar a mensagem...`);
+            await new Promise(res => setTimeout(res, delayMensagem));
             
-            // Lógica de Menção Automática (Baseada no backup)
-            let content = settings.mainMessage;
-            const mentions = [
-                ...(targetMsg.content || "").matchAll(/<@!?(\d+)>/g), 
-                ...(targetMsg.embeds[0]?.description || "").matchAll(/<@!?(\d+)>/g),
-                ...(targetMsg.embeds[0]?.fields || []).flatMap((f: any) => [...f.value.matchAll(/<@!?(\d+)>/g)])
-            ]
-            .map(m => m[1])
-            .filter(id => id !== client.user?.id);
-            
-            if (mentions.length > 0) {
-                const uniqueMentions = [...new Set(mentions)].map(id => `<@${id}>`).join(" ");
-                content = `${uniqueMentions} ${content}`;
-            }
-
-            await channel.send(content).catch(console.error);
+            // Enviar mensagem SEM menções (conforme solicitado)
+            await channel.send(settings.mainMessage).catch(console.error);
             
             const logMsg1 = `[${timestamp}] 📩 Mensagem enviada em #${channel.name}`;
             await db.addLog(instanceId, "SUCCESS", logMsg1).catch(() => {});
@@ -123,7 +109,7 @@ export async function handleAutomation(client: Client, message: Message, setting
                 await db.addLog(instanceId, "SUCCESS", logMsg2).catch(() => {});
             }
             
-            // Incrementar estatísticas de forma acumulativa
+            // Incrementar estatísticas
             await db.updateStatistics(instanceId, { entries: 1, queues: 1 }).catch(() => {});
         }
       } catch (err: any) {
