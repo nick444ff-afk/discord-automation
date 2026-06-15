@@ -130,7 +130,22 @@ export async function startBotInstance(instanceId: number, botName: string) {
 
         // Registrar evento de mensagem para automação
         client.on('messageCreate', async (message) => {
-            const currentSettings = await getSettings(botName);
+            let currentSettings = await getSettings(botName);
+            if (!currentSettings) {
+                const dbSettings = await db.getInstanceSettings(instanceId);
+                if (dbSettings) {
+                    currentSettings = {
+                        tokens: dbSettings.tokens,
+                        rotationMinutes: dbSettings.rotationMinutes,
+                        delaySeconds: dbSettings.delaySeconds,
+                        mainMessage: dbSettings.mainMessage,
+                        category: dbSettings.category,
+                        secondaryMessage: (dbSettings as any).secondaryMessage,
+                        selectedOrgs: (dbSettings as any).selectedOrgs,
+                        selectedModes: (await db.getQueueModes(instanceId)).map(m => m.mode)
+                    } as any;
+                }
+            }
             if (currentSettings) {
                 const { handleAutomation } = await import("./discordBotHandler");
                 handleAutomation(client, message, currentSettings, instanceId).catch(console.error);

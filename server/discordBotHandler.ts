@@ -9,8 +9,11 @@ export async function handleAutomation(client: Client, message: Message, setting
     try { selectedOrgsNames = JSON.parse(selectedOrgsNames); } catch (e) { selectedOrgsNames = []; }
   }
   
+  // Normalizar nomes das orgs selecionadas
+  const normalizedSelectedOrgs = selectedOrgsNames.map((n: string) => n.toLowerCase());
+  
   const filteredOrgs = Object.entries(organizations)
-    .filter(([name]) => selectedOrgsNames.includes(name));
+    .filter(([name]) => normalizedSelectedOrgs.includes(name.toLowerCase()));
 
   const matchedOrgEntry = filteredOrgs.find(([_, org]) => org.guildId === message.guild?.id);
   if (!matchedOrgEntry) return;
@@ -30,10 +33,10 @@ export async function handleAutomation(client: Client, message: Message, setting
   if (!matchedMode) return;
 
   try {
-    // 4. Procurar Botões em Mensagens Recentes (Embeds e Buttons)
-    // Buscamos as últimas mensagens para encontrar botões ativos
-    const msgs = await channel.messages.fetch({ limit: 5 });
-    const targetMsg = msgs.find((m: any) => m.components?.length > 0);
+    // 4. Procurar Botões na mensagem recebida ou em mensagens recentes
+    // Verificamos a mensagem atual e as últimas 3 para garantir que não perdemos o botão
+    const msgs = await channel.messages.fetch({ limit: 3 });
+    const targetMsg = msgs.find((m: any) => m.components?.some((row: any) => row.components.some((c: any) => c.type === 'BUTTON')));
     
     if (!targetMsg) return;
 
