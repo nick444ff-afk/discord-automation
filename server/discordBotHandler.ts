@@ -3,60 +3,86 @@ import * as db from "./db";
 import { organizations } from "../client/src/config/organizations";
 
 export async function handleAutomation(client: Client, message: Message, settings: any, instanceId: number) {
-  // Obter as orgs selecionadas para esta instância
+  // 1. Filtro de Orgs Selecionadas
   let selectedOrgsNames = settings.selectedOrgs || [];
   if (typeof selectedOrgsNames === 'string') {
-    try {
-      selectedOrgsNames = JSON.parse(selectedOrgsNames);
-    } catch (e) {
-      selectedOrgsNames = [];
-    }
+    try { selectedOrgsNames = JSON.parse(selectedOrgsNames); } catch (e) { selectedOrgsNames = []; }
   }
   
-  // Filtrar as orgs do código apenas pelas que foram selecionadas no painel
   const filteredOrgs = Object.entries(organizations)
     .filter(([name]) => selectedOrgsNames.includes(name));
 
-  // Verificar se a mensagem veio de uma organização configurada e SELECIONADA
-  const matchedOrgEntry = filteredOrgs.find(([_, org]) => 
-    org.guildId === message.guild?.id
-  );
+  const matchedOrgEntry = filteredOrgs.find(([_, org]) => org.guildId === message.guild?.id);
+  if (!matchedOrgEntry) return;
 
-  if (!matchedOrgEntry) {
-    return;
-  }
-
-  // Se encontrou a org, agora verificamos se a categoria do canal bate com a configurada no painel
+  // 2. Filtro de Categoria (Pai do Canal)
   const channel = message.channel as any;
   const categoryName = channel.parent?.name?.toLowerCase() || "";
   const targetCategory = (settings.category || "Mobile").toLowerCase();
 
-  // Verifica se o nome da categoria contém o termo selecionado (ex: "mobile")
-  if (!categoryName.includes(targetCategory)) {
-    return;
-  }
+  if (!categoryName.includes(targetCategory)) return;
+
+  // 3. Filtro de Modos (Nome do Canal)
+  const channelName = channel.name?.toLowerCase() || "";
+  const selectedModes = settings.selectedModes || ['1x1', '2x2', '3x3', '4x4'];
+  const matchedMode = selectedModes.find((mode: string) => channelName.includes(mode.toLowerCase()));
+  
+  if (!matchedMode) return;
 
   try {
-    // Lógica de automação
-    if (message.components && message.components.length > 0) {
-      const timestamp = new Date().toLocaleTimeString();
-      
-      for (const row of message.components) {
-        for (const component of row.components) {
-          if (component.type === 'BUTTON') {
-            try {
-              // Simular um delay humano se configurado
-              const delay = (settings.delaySeconds || 5) * 1000;
-              await new Promise(res => setTimeout(res, delay));
-              
-              await message.clickButton(component.customId);
-              const logMsg = `[${timestamp}] SUCCESS Botão "${component.label || 'Desconhecido'}" clicado.`;
-              console.log(logMsg);
-              await db.addLog(instanceId, "SUCCESS", logMsg).catch(() => {});
-              return;
-            } catch (err: any) {
-              console.error("Erro ao clicar no botão:", err.message);
+    // 4. Procurar Botões em Mensagens Recentes (Embeds e Buttons)
+    // Buscamos as últimas mensagens para encontrar botões ativos
+    const msgs = await channel.messages.fetch({ limit: 5 });
+    const targetMsg = msgs.find((m: any) => m.components?.length > 0);
+    
+    if (!targetMsg) return;
+
+    const timestamp = new Date().toLocaleTimeString();
+
+    for (const row of targetMsg.components) {
+      for (const component of row.components) {
+        if (component.type === 'BUTTON') {
+          // Evitar botões de cancelamento/fechamento
+          const label = (component.label || "").toLowerCase();
+          if (["cancelar", "finalizar", "recusar", "fechar", "sair"].some(word => label.includes(word))) {
+            continue;
+          }
+
+          try {
+            // Delay configurado
+            const delay = (settings.delaySeconds || 12) * 1000;
+            await new Promise(res => setTimeout(res, delay));
+            
+            await targetMsg.clickButton(component.customId);
+            
+            const logMsg = `[${timestamp}] SUCCESS Botão "${component.label || 'Entrar'}" clicado em #${channel.name}`;
+            console.log(logMsg);
+            await db.addLog(instanceId, "SUCCESS", logMsg).catch(() => {});
+
+            // 5. Mandar Mensagem Programada (após o clique)
+            if (settings.mainMessage) {
+                // Pequeno delay após o clique para enviar a mensagem
+                await new Promise(res => setTimeout(res, 2000));
+                
+                // O usuário mencionou que o envio deve ser feito onde as filas aparecem
+                // Por padrão enviamos no canal onde o botão foi clicado
+                await channel.send(settings.mainMessage).catch(console.error);
+                
+                if (settings.secondaryMessage) {
+                    await new Promise(res => setTimeout(res, 1000));
+                    await channel.send(settings.secondaryMessage).catch(console.error);
+                }
+                
+                const msgLog = `[${timestamp}] SUCCESS Mensagem enviada em #${channel.name}`;
+                await db.addLog(instanceId, "SUCCESS", msgLog).catch(() => {});
+                
+                // Incrementar estatísticas
+                await db.updateStatistics(instanceId, { entries: 1 }).catch(() => {});
             }
+
+            return; // Clicou em um botão, encerra para esta mensagem
+          } catch (err: any) {
+            console.error("Erro ao clicar no botão:", err.message);
           }
         }
       }

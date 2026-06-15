@@ -236,11 +236,24 @@ export async function updateStatistics(instanceId: number, stats: Partial<Insert
   const existing = await db.select().from(statistics).where(eq(statistics.instanceId, instanceId)).limit(1);
 
   if (existing.length > 0) {
-    await db.update(statistics).set({ ...stats, updatedAt: new Date() }).where(eq(statistics.instanceId, instanceId));
+    const current = existing[0];
+    const updatedStats = {
+        entries: (current.entries || 0) + (stats.entries || 0),
+        queues: (current.queues || 0) + (stats.queues || 0),
+        matches: (current.matches || 0) + (stats.matches || 0),
+        dms: (current.dms || 0) + (stats.dms || 0),
+        uptime: stats.uptime !== undefined ? stats.uptime : current.uptime,
+        updatedAt: new Date()
+    };
+    await db.update(statistics).set(updatedStats).where(eq(statistics.instanceId, instanceId));
   } else {
     await db.insert(statistics).values({
       instanceId,
-      ...stats,
+      entries: stats.entries || 0,
+      queues: stats.queues || 0,
+      matches: stats.matches || 0,
+      dms: stats.dms || 0,
+      uptime: stats.uptime || 0,
     } as InsertStatistics);
   }
 }

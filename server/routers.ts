@@ -55,6 +55,10 @@ export function registerBotApi(app: express.Express) {
     try {
       const botName = req.params.name;
       const localSettings = await getSettings(botName);
+      const instanceId = botName === "BOT1" ? 1 : 2;
+      const dbModes = await db.getQueueModes(instanceId);
+      const selectedModes = dbModes.length > 0 ? dbModes.map(m => m.mode) : (localSettings as any)?.selectedModes || ['1x1', '2x2', '3x3', '4x4'];
+
       if (localSettings) {
         return res.json({
           tokens: localSettings.tokens,
@@ -63,18 +67,19 @@ export function registerBotApi(app: express.Express) {
           mensagem: localSettings.mainMessage,
           mensagemSecundaria: localSettings.secondaryMessage || "",
           delay: localSettings.delaySeconds || 12,
-          selectedOrgs: localSettings.selectedOrgs || []
+          selectedOrgs: localSettings.selectedOrgs || [],
+          selectedModes: selectedModes
         });
       }
-      res.json({ tokens: "", rotation: 90, category: "Mobile", mensagem: "", mensagemSecundaria: "", delay: 12, selectedOrgs: [] });
+      res.json({ tokens: "", rotation: 90, category: "Mobile", mensagem: "", mensagemSecundaria: "", delay: 12, selectedOrgs: [], selectedModes: ['1x1', '2x2', '3x3', '4x4'] });
     } catch (e) {
-      res.json({ tokens: "", rotation: 90, category: "Mobile", mensagem: "", mensagemSecundaria: "", delay: 12, selectedOrgs: [] });
+      res.json({ tokens: "", rotation: 90, category: "Mobile", mensagem: "", mensagemSecundaria: "", delay: 12, selectedOrgs: [], selectedModes: ['1x1', '2x2', '3x3', '4x4'] });
     }
   });
 
   // POST Config
   app.post("/api/bot/config/:name", async (req, res) => {
-    const { tokens, rotation, category, mensagem, mensagemSecundaria, delay, selectedOrgs } = req.body;
+    const { tokens, rotation, category, mensagem, mensagemSecundaria, delay, selectedOrgs, selectedModes } = req.body;
     const botName = req.params.name;
     const instanceId = botName === "BOT1" ? 1 : 2;
     
@@ -85,7 +90,8 @@ export function registerBotApi(app: express.Express) {
       mainMessage: mensagem || "",
       secondaryMessage: mensagemSecundaria || "",
       category: category || "Mobile",
-      selectedOrgs: selectedOrgs || []
+      selectedOrgs: selectedOrgs || [],
+      selectedModes: selectedModes || ['1x1', '2x2', '3x3', '4x4']
     };
 
     try {
@@ -100,7 +106,12 @@ export function registerBotApi(app: express.Express) {
       db.getUserInstances(DEFAULT_USER.id).then(async (instances) => {
         let instance = instances.find(i => i.name.replace(/\s+/g, "") === botName);
         if (!instance) instance = await db.createInstance(DEFAULT_USER.id, botName === "BOT1" ? "BOT 1" : "BOT 2");
-        if (instance) await db.createOrUpdateInstanceSettings(instance.id, { instanceId: instance.id, ...settings });
+        if (instance) {
+          await db.createOrUpdateInstanceSettings(instance.id, { instanceId: instance.id, ...settings });
+          if (selectedModes) {
+            await db.setQueueModes(instance.id, selectedModes);
+          }
+        }
       }).catch(() => {});
 
       res.json({ success: true, message: "Configuração salva!" });

@@ -42,33 +42,7 @@ async function scanDiscordData(client: Client, instanceId: number) {
         for (const [guildId, baseGuild] of guilds) {
             try {
                 const guild = await baseGuild.fetch();
-                addMemoryLog(instanceId, "SUCCESS", `🏢 Servidor: ${guild.name}`);
-
-                const channels = await guild.channels.fetch();
-                
-                // Categorias
-                const categories = channels.filter(c => c.type === 'GUILD_CATEGORY');
-                if (categories.size > 0) {
-                    addMemoryLog(instanceId, "INFO", `  📁 Categorias (${categories.size}): ${categories.map(c => c.name).join(', ')}`);
-                } else {
-                    addMemoryLog(instanceId, "INFO", "  📁 Nenhuma categoria encontrada neste servidor.");
-                }
-
-                // Canais de Texto
-                const textChannels = channels.filter(c => c.type === 'GUILD_TEXT');
-                if (textChannels.size > 0) {
-                    addMemoryLog(instanceId, "INFO", `  💬 Canais de Texto (${textChannels.size}): ${textChannels.map(c => c.name).join(', ')}`);
-                } else {
-                    addMemoryLog(instanceId, "INFO", "  💬 Nenhum canal de texto encontrado.");
-                }
-
-                // Tópicos (Threads)
-                const threads = await guild.channels.fetchActiveThreads();
-                if (threads.threads.size > 0) {
-                    addMemoryLog(instanceId, "INFO", `  🧵 Tópicos Ativos (${threads.threads.size}): ${threads.threads.map(t => t.name).join(', ')}`);
-                } else {
-                    addMemoryLog(instanceId, "INFO", "  🧵 Nenhum tópico ativo encontrado.");
-                }
+                addMemoryLog(instanceId, "SUCCESS", `🏢 Org escaneada: ${guild.name}`);
 
             } catch (guildErr: any) {
                 addMemoryLog(instanceId, "ERROR", `❌ Erro ao escanear servidor ${guildId}: ${guildErr.message}`);
@@ -100,7 +74,8 @@ export async function startBotInstance(instanceId: number, botName: string) {
                     mainMessage: dbSettings.mainMessage,
                     category: dbSettings.category,
                     secondaryMessage: (dbSettings as any).secondaryMessage,
-                    selectedOrgs: (dbSettings as any).selectedOrgs
+                    selectedOrgs: (dbSettings as any).selectedOrgs,
+                    selectedModes: (await db.getQueueModes(instanceId)).map(m => m.mode)
                 };
             }
         } catch (e) {}
@@ -135,7 +110,8 @@ export async function startBotInstance(instanceId: number, botName: string) {
           const inst = botInstances.get(instanceId);
           if (inst) {
             inst.uptimeSeconds += 5;
-            db.updateStatistics(instanceId, { uptime: inst.uptimeSeconds }).catch(() => {});
+            // Passamos apenas o uptime, a função updateStatistics agora mantém os outros valores
+            db.updateStatistics(instanceId, { uptime: inst.uptimeSeconds, entries: 0, queues: 0, matches: 0, dms: 0 }).catch(() => {});
           }
         }, 5000);
 

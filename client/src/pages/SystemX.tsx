@@ -422,6 +422,8 @@ export default function SystemX() {
   
   const [availableOrgs, setAvailableOrgs] = useState<string[]>(['Brasil', 'Slash', 'Farm', 'Romenia']);
   const [selectedOrgs, setSelectedOrgs] = useState<string[]>(['Brasil', 'Slash', 'Farm', 'Romenia']);
+  const [selectedModes, setSelectedModes] = useState<string[]>(['1x1', '2x2', '3x3', '4x4']);
+  const queueModes = ['1x1', '2x2', '3x3', '4x4'];
 
   // Carregar orgs disponíveis do código via API
   useEffect(() => {
@@ -446,6 +448,7 @@ export default function SystemX() {
         setMensagemSecundaria(data.mensagemSecundaria || '');
         setDelay(data.delay || 12);
         setSelectedOrgs(data.selectedOrgs || []);
+        setSelectedModes(data.selectedModes || ['1x1', '2x2', '3x3', '4x4']);
       });
   }, [activeBot]);
 
@@ -498,8 +501,9 @@ export default function SystemX() {
           category, 
           mensagem, 
           mensagemSecundaria, 
-          delay, 
-          selectedOrgs 
+          delay,
+          selectedOrgs,
+          selectedModes
         })
       });
       const data = await res.json();
@@ -528,6 +532,14 @@ export default function SystemX() {
       prev.includes(orgName) 
         ? prev.filter(name => name !== orgName) 
         : [...prev, orgName]
+    );
+  };
+
+  const toggleModeSelection = (mode: string) => {
+    setSelectedModes(prev => 
+      prev.includes(mode) 
+        ? prev.filter(m => m !== mode) 
+        : [...prev, mode]
     );
   };
 
@@ -609,6 +621,20 @@ export default function SystemX() {
               </label>
             ))}
             {availableOrgs.length === 0 && <p style={{opacity: 0.5, fontSize: '13px'}}>Nenhuma org encontrada no código.</p>}
+          </div>
+
+          <label>Modos de Fila</label>
+          <div className="orgs-box">
+            {queueModes.map((mode, i) => (
+              <label key={i} className="org-item">
+                <input 
+                  type="checkbox" 
+                  checked={selectedModes.includes(mode)}
+                  onChange={() => toggleModeSelection(mode)}
+                />
+                <span>{mode}</span>
+              </label>
+            ))}
           </div>
 
           <label>Delay (segundos)</label>
