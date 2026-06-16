@@ -5,10 +5,9 @@ Consolidates instances, instanceSettings, and related data into simplified table
 
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, create_engine, event
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base, relationship
-from sqlmodel import SQLModel, Field, Session
+from sqlmodel import SQLModel, Field, Session, Relationship
 import os
 from dotenv import load_dotenv
 
@@ -38,8 +37,6 @@ AsyncSessionLocal = async_sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False, autoflush=False
 )
 
-Base = declarative_base()
-
 
 # ==================== MODELS ====================
 
@@ -58,7 +55,7 @@ class User(SQLModel, table=True):
     last_signed_in: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
-    bots: List["Bot"] = None
+    bots: List["Bot"] = Relationship(back_populates="user")
 
 
 class Bot(SQLModel, table=True):
@@ -90,8 +87,9 @@ class Bot(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
-    statistics: Optional["Statistics"] = None
-    queue_modes: List["QueueMode"] = None
+    user: Optional[User] = Relationship(back_populates="bots")
+    statistics: Optional["Statistics"] = Relationship(back_populates="bot")
+    queue_modes: List["QueueMode"] = Relationship(back_populates="bot")
 
 
 class Statistics(SQLModel, table=True):
@@ -107,6 +105,9 @@ class Statistics(SQLModel, table=True):
     uptime: int = Field(default=0)  # in seconds
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Relationships
+    bot: Optional[Bot] = Relationship(back_populates="statistics")
 
 
 class QueueMode(SQLModel, table=True):
@@ -117,6 +118,9 @@ class QueueMode(SQLModel, table=True):
     bot_id: int = Field(foreign_key="bots.id", index=True)
     mode: str = Field(max_length=10)  # 1x1, 2x2, 3x3, 4x4
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Relationships
+    bot: Optional[Bot] = Relationship(back_populates="queue_modes")
 
 
 class Organization(SQLModel, table=True):
