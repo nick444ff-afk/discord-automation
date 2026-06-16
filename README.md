@@ -1,254 +1,277 @@
-# Discord Bot Manager SaaS
+# Discord Automation - Python Backend
 
-Um painel SaaS premium para gerenciamento de múltiplas instâncias de bots Discord com design moderno, tema azul escuro, glassmorphism e animações suaves. Totalmente responsivo para mobile e desktop.
+Refatoração completa do backend de automação Discord de TypeScript/Express para Python/FastAPI, com simplificação da arquitetura e consolidação do banco de dados.
 
-## Características
+## 🎯 Objetivo
 
-### 🎯 Dashboard Principal
-- **Estatísticas em Tempo Real:** Entradas, Filas Ativas, Partidas Encontradas, DMs Enviadas, Uptime e Bots Online
-- **Cards Premium:** Design glassmorphism com efeitos visuais sofisticados
-- **Animações Suaves:** Transições fluidas em toda a interface
+Migrar o backend da automação Discord para uma stack Python moderna, mantendo as funcionalidades essenciais enquanto reduz a complexidade da arquitetura.
 
-### 🤖 Gerenciamento de Instâncias
-- **Múltiplas Instâncias:** Suporte para BOT 1, BOT 2 e futuras instâncias sem alteração estrutural
-- **Independência Total:** Cada instância tem suas próprias configurações, tokens, estatísticas e logs
-- **Controle Individual:** Botões de ligar/desligar para cada bot com status em tempo real
-- **Seleção Inteligente:** Selecione uma instância para ver detalhes e configurações específicas
+## 📋 Stack Tecnológica
 
-### ⚙️ Configurações Avançadas
-- **Tokens:** Gerenciamento de múltiplos tokens com rotação automática
-- **Delays:** Configuração de delays de mensagem por instância
-- **Mensagens:** Mensagem principal e secundária por organização
-- **Categorias:** Seleção entre Mobile, Emulador, Misto, Tático e Full soco
-- **Modos de Fila:** Suporte para 1x1, 2x2, 3x3 e 4x4
-- **Organizações:** Gerenciamento de organizações/guilds com mensagens customizadas
+- **Linguagem**: Python 3.11+
+- **Framework Web/API**: FastAPI (substitui Express + tRPC)
+- **Comunicação em Tempo Real**: WebSockets nativos do FastAPI (substitui Socket.IO)
+- **Banco de Dados**: SQLite (desenvolvimento) / PostgreSQL (produção)
+- **ORM**: SQLAlchemy 2.0 + SQLModel
+- **Automação Discord**: discord.py-self (equivalente ao discord.js-selfbot-v13)
 
-### 📊 Logs em Tempo Real
-- **Socket.IO:** Comunicação em tempo real via WebSocket
-- **Filtros Avançados:** Filtrar por nível (INFO, SUCCESS, WARNING, ERROR)
-- **Download:** Exportar logs como arquivo .txt
-- **Limpeza:** Limpar todos os logs com um clique
-- **Auto-scroll:** Scroll automático para o último log
+## 📁 Estrutura de Pastas
 
-### 🎨 Design Premium
-- **Tema Azul Escuro:** Paleta de cores profissional SaaS
-- **Glassmorphism:** Efeitos de vidro fosco nos cards
-- **Animações:** Transições suaves e efeitos de hover
-- **Ícones:** Lucide React para ícones consistentes
-- **Tipografia:** Inter font para leitura profissional
-- **Responsivo:** Totalmente adaptado para mobile e desktop
+```
+discord-automation-python/
+├── app/
+│   ├── __init__.py              # Inicialização do pacote
+│   ├── main.py                  # Ponto de entrada do FastAPI
+│   ├── database.py              # Modelos SQLAlchemy consolidados
+│   ├── bot_manager.py           # Gerenciador de instâncias de bots
+│   ├── routes.py                # Endpoints REST da API
+│   └── websocket.py             # Handlers de WebSocket
+├── requirements.txt             # Dependências Python
+├── .env                         # Variáveis de ambiente
+└── README.md                    # Este arquivo
+```
 
-## Stack Tecnológico
+## 🗄️ Consolidação do Banco de Dados
 
-### Frontend
-- **React 19** - UI library
-- **TypeScript** - Type safety
-- **TailwindCSS 4** - Utility-first CSS
-- **ShadCN/UI** - Componentes acessíveis
-- **Socket.IO Client** - Comunicação em tempo real
-- **Lucide React** - Ícones
+### Antes (7 tabelas)
+- `users`
+- `instances`
+- `instanceSettings`
+- `queueModes`
+- `organizations`
+- `statistics`
+- `logs`
 
-### Backend
-- **Express.js** - Web framework
-- **tRPC 11** - End-to-end type-safe APIs
-- **Socket.IO** - Real-time communication
-- **Drizzle ORM** - Type-safe database queries
-- **MySQL** - Database
+### Depois (Simplificado)
+- `users` - Usuários do sistema
+- `bots` - Consolidação de instances + instanceSettings
+- `statistics` - Estatísticas dos bots
+- `queue_modes` - Modos de fila suportados
+- `organizations` - Organizações/Guilds
+- `logs` - Logs em tempo real
 
-### DevOps
-- **Vite** - Build tool
-- **Vitest** - Testing framework
-- **Docker** - Containerization
-- **Railway** - Hosting
+## 🚀 Instalação e Setup
 
-## Instalação
-
-### Pré-requisitos
-- Node.js 18+
-- pnpm 10+
-- MySQL 8+
-
-### Setup Local
-
+### 1. Clonar o Repositório
 ```bash
-# Instalar dependências
-pnpm install
+git clone https://github.com/nick444ff-afk/discord-automation.git
+cd discord-automation-python
+```
 
-# Configurar variáveis de ambiente
+### 2. Criar Ambiente Virtual
+```bash
+python3.11 -m venv venv
+source venv/bin/activate  # Linux/macOS
+# ou
+venv\Scripts\activate  # Windows
+```
+
+### 3. Instalar Dependências
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configurar Variáveis de Ambiente
+```bash
 cp .env.example .env
-
-# Executar migrations do banco
-pnpm db:push
-
-# Iniciar servidor de desenvolvimento
-pnpm dev
+# Editar .env com suas configurações
 ```
 
-O servidor estará disponível em `http://localhost:3000`
-
-## Estrutura do Projeto
-
-```
-discord-automation-v2/
-├── client/                    # Frontend React
-│   ├── src/
-│   │   ├── pages/            # Páginas principais
-│   │   ├── components/       # Componentes reutilizáveis
-│   │   ├── hooks/            # Custom hooks
-│   │   ├── types/            # Type definitions
-│   │   ├── lib/              # Utilitários
-│   │   └── index.css         # Estilos globais
-│   └── index.html            # HTML template
-├── server/                    # Backend Express
-│   ├── routers.ts            # tRPC routers
-│   ├── db.ts                 # Database helpers
-│   ├── socketIO.ts           # Socket.IO utilities
-│   └── _core/                # Framework core
-├── drizzle/                   # Database schema e migrations
-├── shared/                    # Código compartilhado
-└── package.json              # Dependências
+### 5. Inicializar Banco de Dados
+```bash
+python -c "from app.database import init_db; import asyncio; asyncio.run(init_db())"
 ```
 
-## Arquitetura de Banco de Dados
-
-### Tabelas Principais
-- **users** - Usuários autenticados
-- **instances** - Instâncias de bots
-- **instanceSettings** - Configurações por instância
-- **queueModes** - Modos de fila suportados
-- **organizations** - Organizações/guilds
-- **statistics** - Estatísticas agregadas
-- **logs** - Logs em tempo real
-
-## API tRPC
-
-### Instâncias
-```typescript
-trpc.instances.list.useQuery()
-trpc.instances.create.useMutation()
-trpc.instances.updateStatus.useMutation()
-trpc.instances.updateUptime.useMutation()
+### 6. Executar o Servidor
+```bash
+python -m app.main
+# ou
+uvicorn app.main:app --reload
 ```
 
-### Configurações
-```typescript
-trpc.settings.get.useQuery()
-trpc.settings.save.useMutation()
-```
+O servidor estará disponível em `http://localhost:8000`
 
-### Modos de Fila
-```typescript
-trpc.queueModes.get.useQuery()
-trpc.queueModes.set.useMutation()
-```
+## 📚 API Endpoints
 
-### Estatísticas
-```typescript
-trpc.statistics.get.useQuery()
-trpc.statistics.update.useMutation()
-trpc.statistics.aggregated.useQuery()
-```
+### Health Check
+- `GET /` - Root endpoint
+- `GET /health` - Health check
+
+### Bot Management
+- `GET /api/bots` - Listar todos os bots de um usuário
+- `POST /api/bots` - Criar novo bot
+- `GET /api/bots/{bot_id}` - Obter detalhes do bot
+- `PUT /api/bots/{bot_id}` - Atualizar configuração do bot
+- `DELETE /api/bots/{bot_id}` - Deletar bot
+
+### Bot Control
+- `POST /api/bots/{bot_id}/start` - Iniciar bot
+- `POST /api/bots/{bot_id}/stop` - Parar bot
+- `GET /api/bots/{bot_id}/status` - Obter status do bot
+
+### Statistics
+- `GET /api/bots/{bot_id}/statistics` - Obter estatísticas
+- `PUT /api/bots/{bot_id}/statistics` - Atualizar estatísticas
 
 ### Logs
-```typescript
-trpc.logs.list.useQuery()
-trpc.logs.add.useMutation()
-trpc.logs.clear.useMutation()
+- `GET /api/bots/{bot_id}/logs` - Obter logs (memória + banco)
+- `POST /api/bots/{bot_id}/logs` - Adicionar log
+
+## 🔌 WebSocket Endpoints
+
+### Real-time Logs
+- `WS /ws/logs/{bot_id}` - Stream de logs em tempo real
+  - Comando: `{"command": "ping"}` - Keep-alive
+  - Comando: `{"command": "get_logs"}` - Obter logs atuais
+  - Comando: `{"command": "get_status"}` - Obter status
+
+### Real-time Status
+- `WS /ws/status/{bot_id}` - Atualizações de status a cada 5 segundos
+
+## 🤖 Gerenciador de Bots
+
+### Funcionalidades
+
+1. **Múltiplas Instâncias**: Gerencia múltiplos bots em paralelo
+2. **Estados**: offline, authenticating, scanning, running, error
+3. **Logs em Memória**: Últimos 100 logs armazenados em memória
+4. **Rastreamento de Uptime**: Atualiza uptime a cada 5 segundos
+5. **Automação**: Detecta mensagens, clica em botões e envia respostas
+
+### Estados do Bot
+
+- **offline**: Bot não está rodando
+- **authenticating**: Validando token do Discord
+- **scanning**: Escaneando servidores e canais
+- **running**: Bot ativo e pronto para automação
+- **error**: Erro durante execução
+
+## 🔐 Segurança
+
+- CORS configurável via variáveis de ambiente
+- Trusted Host middleware
+- Type hints completos para validação
+- Tratamento de exceções robusto
+- Logs estruturados
+
+## 📊 Modelos de Dados
+
+### Bot (Consolidado)
+```python
+{
+    "id": int,
+    "user_id": int,
+    "name": str,
+    "status": str,
+    "uptime_seconds": int,
+    "tokens": str,
+    "rotation_minutes": int,
+    "delay_seconds": int,
+    "main_message": str,
+    "secondary_message": str | None,
+    "category": str,
+    "selected_orgs": str | None,
+    "selected_modes": str | None,
+    "created_at": datetime,
+    "updated_at": datetime
+}
 ```
 
-## Socket.IO Events
-
-### Client → Server
-```typescript
-socket.emit('subscribe:logs', instanceId)
-socket.emit('unsubscribe:logs', instanceId)
+### Statistics
+```python
+{
+    "id": int,
+    "bot_id": int,
+    "entries": int,
+    "queues": int,
+    "matches": int,
+    "dms": int,
+    "uptime": int,
+    "created_at": datetime,
+    "updated_at": datetime
+}
 ```
 
-### Server → Client
-```typescript
-socket.on('log', (data) => {
-  // { instanceId, level, message, timestamp }
-})
-socket.on('stats:update', (data) => {
-  // { instanceId, ...stats, timestamp }
-})
-socket.on('instance:status', (data) => {
-  // { instanceId, status, timestamp }
-})
+### Log
+```python
+{
+    "id": int,
+    "bot_id": int,
+    "level": str,  # INFO, SUCCESS, WARNING, ERROR
+    "message": str,
+    "created_at": datetime
+}
 ```
 
-## Testes
+## 🔄 Fluxo de Automação
 
-```bash
-# Executar todos os testes
-pnpm test
+1. **Autenticação**: Token validado e bot conecta ao Discord
+2. **Escaneamento**: Bot escaneia servidores e canais disponíveis
+3. **Monitoramento**: Bot aguarda mensagens nos canais configurados
+4. **Filtros**: Aplica filtros de organização, categoria e modo
+5. **Detecção**: Encontra mensagens com botões
+6. **Clique**: Clica no botão apropriado com delay aleatório
+7. **Envio**: Envia mensagens configuradas com delays
+8. **Logging**: Registra todas as ações em tempo real
 
-# Executar testes em modo watch
-pnpm test --watch
+## 🐛 Troubleshooting
 
-# Gerar coverage
-pnpm test --coverage
-```
+### Bot não conecta
+- Verificar token válido
+- Verificar permissões da conta no Discord
+- Verificar logs de erro na console
 
-## Build para Produção
+### Mensagens não são enviadas
+- Verificar permissões no canal
+- Verificar se o bot está em estado "running"
+- Verificar delays configurados
 
-```bash
-# Build frontend
-pnpm build
+### WebSocket desconecta
+- Verificar conexão de rede
+- Verificar logs do servidor
+- Reconectar cliente
 
-# Iniciar servidor de produção
-pnpm start
-```
+## 📝 Logs
 
-## Deploy na Railway
+Logs são armazenados em dois lugares:
+
+1. **Memória**: Últimos 100 logs por bot (rápido, não persistente)
+2. **Banco de Dados**: Todos os logs (persistente, mais lento)
+
+Configure o nível de log via `LOG_LEVEL` no `.env`
+
+## 🚢 Deployment
+
+### Railway (Recomendado)
 
 1. Conectar repositório GitHub
 2. Configurar variáveis de ambiente
-3. Railway detectará automaticamente `package.json`
-4. Deploy será iniciado automaticamente
+3. Usar `python -m app.main` como comando de start
+4. Railway detectará `requirements.txt` automaticamente
 
-### Variáveis de Ambiente Necessárias
-- `DATABASE_URL` - MySQL connection string
-- `JWT_SECRET` - Session signing secret
-- `VITE_APP_ID` - Manus OAuth app ID
-- `OAUTH_SERVER_URL` - OAuth server URL
-- `NODE_ENV` - production
+### Docker
 
-## Escalabilidade
+```dockerfile
+FROM python:3.11-slim
 
-A arquitetura foi projetada para ser escalável:
+WORKDIR /app
 
-- **Múltiplas Instâncias:** Adicione BOT 3, BOT 4, etc. sem alterações estruturais
-- **Banco de Dados:** Schema suporta crescimento horizontal
-- **Socket.IO:** Rooms por instância para comunicação eficiente
-- **tRPC:** Type-safe APIs facilitam manutenção
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-## Roadmap Futuro
+COPY . .
 
-- [ ] Integração com Discord.js para controle real de bots
-- [ ] Dashboard de analytics avançado
-- [ ] Sistema de webhooks
-- [ ] Agendamento de tarefas
-- [ ] Multi-tenancy
-- [ ] API pública
-- [ ] Mobile app nativa
+CMD ["python", "-m", "app.main"]
+```
 
-## Contribuindo
+## 📄 Licença
 
-1. Fork o repositório
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
+MIT
 
-## Licença
+## 👨‍💻 Autor
 
-MIT License - veja LICENSE para detalhes
+Nick444ff
 
-## Suporte
+## 🤝 Contribuições
 
-Para suporte, abra uma issue no GitHub ou entre em contato através do email.
-
----
-
-**Desenvolvido com ❤️ usando React, TypeScript e TailwindCSS**
+Contribuições são bem-vindas! Abra uma issue ou pull request.
