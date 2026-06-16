@@ -183,6 +183,17 @@ async def get_instance(session: AsyncSession, instance_id: int) -> Optional[Inst
     return result.scalar_one_or_none()
 
 
+async def update_bot_status(session: AsyncSession, instance_id: int, status: str) -> Optional[Instance]:
+    """Update bot instance status."""
+    instance = await get_instance(session, instance_id)
+    if instance:
+        instance.status = status
+        instance.updatedAt = datetime.utcnow()
+        await session.commit()
+        await session.refresh(instance)
+    return instance
+
+
 async def get_user_instances(session: AsyncSession, user_id: int) -> List[Instance]:
     """Get all instances for a user."""
     from sqlalchemy import select
