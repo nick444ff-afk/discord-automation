@@ -1,6 +1,6 @@
 """
 Database configuration and models for Discord Automation.
-Consolidates instances, instanceSettings, and related data into simplified tables.
+Alinhado com a estrutura do novo frontend (Drizzle Schema).
 """
 
 from datetime import datetime
@@ -45,51 +45,54 @@ class User(SQLModel, table=True):
     __tablename__ = "users"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    open_id: str = Field(unique=True, index=True, max_length=64)
+    openId: str = Field(unique=True, index=True, max_length=64)
     name: Optional[str] = None
     email: Optional[str] = Field(default=None, max_length=320)
-    login_method: Optional[str] = Field(default=None, max_length=64)
-    role: str = Field(default="user", max_length=64)  # 'user' or 'admin'
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    last_signed_in: datetime = Field(default_factory=datetime.utcnow)
+    loginMethod: Optional[str] = Field(default=None, max_length=64)
+    role: str = Field(default="user", max_length=64)
+    createdAt: datetime = Field(default_factory=datetime.utcnow)
+    updatedAt: datetime = Field(default_factory=datetime.utcnow)
+    lastSignedIn: datetime = Field(default_factory=datetime.utcnow)
     
-    # Relationships
-    bots: List["Bot"] = Relationship(back_populates="user")
+    instances: List["Instance"] = Relationship(back_populates="user")
 
 
-class Bot(SQLModel, table=True):
-    """
-    Consolidated Bot table combining instances and instanceSettings.
-    Represents each independent bot instance with its configuration.
-    """
-    __tablename__ = "bots"
+class Instance(SQLModel, table=True):
+    """Bot instances table - represents each independent bot instance."""
+    __tablename__ = "instances"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
-    name: str = Field(max_length=255)  # "BOT 1", "BOT 2", etc.
-    status: str = Field(default="offline", max_length=50)  # 'online', 'offline', 'error', 'authenticating', 'scanning'
-    uptime_seconds: int = Field(default=0)  # in seconds
+    userId: int = Field(foreign_key="users.id", index=True)
+    name: str = Field(max_length=255)
+    status: str = Field(default="offline", max_length=50)
+    uptime: int = Field(default=0)
+    processId: Optional[int] = None
+    createdAt: datetime = Field(default_factory=datetime.utcnow)
+    updatedAt: datetime = Field(default_factory=datetime.utcnow)
     
-    # Configuration fields (from instanceSettings)
-    tokens: str  # JSON array of tokens
-    rotation_minutes: int = Field(default=60)
-    delay_seconds: int = Field(default=12)
-    main_message: str
-    secondary_message: Optional[str] = None
-    category: str = Field(max_length=50)  # Mobile, Emulador, Misto, Tático, Full soco
-    selected_orgs: Optional[str] = None  # JSON string of selected organizations
-    selected_modes: Optional[str] = None  # JSON string of selected modes (1x1, 2x2, 3x3, 4x4)
+    user: Optional[User] = Relationship(back_populates="instances")
+    settings: Optional["InstanceSettings"] = Relationship(back_populates="instance")
+    statistics: Optional["Statistics"] = Relationship(back_populates="instance")
+    queueModes: List["QueueMode"] = Relationship(back_populates="instance")
+
+
+class InstanceSettings(SQLModel, table=True):
+    """Instance settings table - stores configuration for each bot instance."""
+    __tablename__ = "instanceSettings"
     
-    # Metadata
-    process_id: Optional[int] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    instanceId: int = Field(foreign_key="instances.id", index=True)
+    tokens: str
+    rotationMinutes: int = Field(default=60)
+    delaySeconds: int = Field(default=12)
+    mainMessage: str
+    secondaryMessage: Optional[str] = None
+    category: str = Field(max_length=50)
+    selectedOrgs: Optional[str] = None
+    createdAt: datetime = Field(default_factory=datetime.utcnow)
+    updatedAt: datetime = Field(default_factory=datetime.utcnow)
     
-    # Relationships
-    user: Optional[User] = Relationship(back_populates="bots")
-    statistics: Optional["Statistics"] = Relationship(back_populates="bot")
-    queue_modes: List["QueueMode"] = Relationship(back_populates="bot")
+    instance: Optional[Instance] = Relationship(back_populates="settings")
 
 
 class Statistics(SQLModel, table=True):
@@ -97,30 +100,28 @@ class Statistics(SQLModel, table=True):
     __tablename__ = "statistics"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    bot_id: int = Field(foreign_key="bots.id", index=True)
+    instanceId: int = Field(foreign_key="instances.id", index=True)
     entries: int = Field(default=0)
     queues: int = Field(default=0)
     matches: int = Field(default=0)
     dms: int = Field(default=0)
-    uptime: int = Field(default=0)  # in seconds
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    uptime: int = Field(default=0)
+    createdAt: datetime = Field(default_factory=datetime.utcnow)
+    updatedAt: datetime = Field(default_factory=datetime.utcnow)
     
-    # Relationships
-    bot: Optional[Bot] = Relationship(back_populates="statistics")
+    instance: Optional[Instance] = Relationship(back_populates="statistics")
 
 
 class QueueMode(SQLModel, table=True):
     """Queue modes supported by each bot instance."""
-    __tablename__ = "queue_modes"
+    __tablename__ = "queueModes"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    bot_id: int = Field(foreign_key="bots.id", index=True)
-    mode: str = Field(max_length=10)  # 1x1, 2x2, 3x3, 4x4
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    instanceId: int = Field(foreign_key="instances.id", index=True)
+    mode: str = Field(max_length=10)
+    createdAt: datetime = Field(default_factory=datetime.utcnow)
     
-    # Relationships
-    bot: Optional[Bot] = Relationship(back_populates="queue_modes")
+    instance: Optional[Instance] = Relationship(back_populates="queueModes")
 
 
 class Organization(SQLModel, table=True):
@@ -128,27 +129,23 @@ class Organization(SQLModel, table=True):
     __tablename__ = "organizations"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    bot_id: int = Field(foreign_key="bots.id", index=True)
+    instanceId: int = Field(foreign_key="instances.id", index=True)
     name: str = Field(max_length=255)
-    guild_id: str = Field(max_length=255)  # Discord Guild ID
-    enabled: bool = Field(default=True)
-    custom_message: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    enabled: int = Field(default=1)
+    customMessage: Optional[str] = None
+    createdAt: datetime = Field(default_factory=datetime.utcnow)
+    updatedAt: datetime = Field(default_factory=datetime.utcnow)
 
 
 class Log(SQLModel, table=True):
-    """
-    Real-time logs for each bot instance.
-    Can be kept in memory or persisted to database.
-    """
+    """Real-time logs for each bot instance."""
     __tablename__ = "logs"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    bot_id: int = Field(foreign_key="bots.id", index=True)
-    level: str = Field(max_length=20)  # INFO, SUCCESS, WARNING, ERROR
+    instanceId: int = Field(foreign_key="instances.id", index=True)
+    level: str = Field(max_length=20)
     message: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    createdAt: datetime = Field(default_factory=datetime.utcnow)
 
 
 # ==================== DATABASE INITIALIZATION ====================
@@ -179,84 +176,74 @@ async def get_user(session: AsyncSession, user_id: int) -> Optional[User]:
     return result.scalar_one_or_none()
 
 
-async def get_bot(session: AsyncSession, bot_id: int) -> Optional[Bot]:
-    """Get bot by ID."""
+async def get_instance(session: AsyncSession, instance_id: int) -> Optional[Instance]:
+    """Get instance by ID."""
     from sqlalchemy import select
-    result = await session.execute(select(Bot).where(Bot.id == bot_id))
+    result = await session.execute(select(Instance).where(Instance.id == instance_id))
     return result.scalar_one_or_none()
 
 
-async def get_user_bots(session: AsyncSession, user_id: int) -> List[Bot]:
-    """Get all bots for a user."""
+async def get_user_instances(session: AsyncSession, user_id: int) -> List[Instance]:
+    """Get all instances for a user."""
     from sqlalchemy import select
-    result = await session.execute(select(Bot).where(Bot.user_id == user_id))
+    result = await session.execute(select(Instance).where(Instance.userId == user_id))
     return result.scalars().all()
 
 
-async def create_bot(session: AsyncSession, user_id: int, bot_data: dict) -> Bot:
+async def create_instance(session: AsyncSession, user_id: int, name: str) -> Instance:
     """Create a new bot instance."""
-    bot = Bot(user_id=user_id, **bot_data)
-    session.add(bot)
+    instance = Instance(userId=user_id, name=name)
+    session.add(instance)
     await session.commit()
-    await session.refresh(bot)
-    return bot
+    await session.refresh(instance)
+    return instance
 
 
-async def update_bot(session: AsyncSession, bot_id: int, bot_data: dict) -> Optional[Bot]:
-    """Update bot configuration."""
-    bot = await get_bot(session, bot_id)
-    if bot:
-        for key, value in bot_data.items():
-            setattr(bot, key, value)
-        bot.updated_at = datetime.utcnow()
-        await session.commit()
-        await session.refresh(bot)
-    return bot
-
-
-async def update_bot_status(session: AsyncSession, bot_id: int, status: str) -> Optional[Bot]:
-    """Update bot status."""
-    return await update_bot(session, bot_id, {"status": status})
-
-
-async def get_statistics(session: AsyncSession, bot_id: int) -> Optional[Statistics]:
-    """Get statistics for a bot."""
+async def get_instance_settings(session: AsyncSession, instance_id: int) -> Optional[InstanceSettings]:
+    """Get settings for an instance."""
     from sqlalchemy import select
-    result = await session.execute(select(Statistics).where(Statistics.bot_id == bot_id))
+    result = await session.execute(select(InstanceSettings).where(InstanceSettings.instanceId == instance_id))
     return result.scalar_one_or_none()
 
 
-async def update_statistics(session: AsyncSession, bot_id: int, stats_data: dict) -> Optional[Statistics]:
-    """Update bot statistics."""
-    stats = await get_statistics(session, bot_id)
-    if not stats:
-        stats = Statistics(bot_id=bot_id, **stats_data)
-        session.add(stats)
+async def update_instance_settings(session: AsyncSession, instance_id: int, settings_data: dict) -> InstanceSettings:
+    """Update or create instance settings."""
+    settings = await get_instance_settings(session, instance_id)
+    if not settings:
+        settings = InstanceSettings(instanceId=instance_id, **settings_data)
+        session.add(settings)
     else:
-        for key, value in stats_data.items():
-            setattr(stats, key, value)
-    stats.updated_at = datetime.utcnow()
+        for key, value in settings_data.items():
+            setattr(settings, key, value)
+        settings.updatedAt = datetime.utcnow()
     await session.commit()
-    await session.refresh(stats)
-    return stats
+    await session.refresh(settings)
+    return settings
 
 
-async def add_log(session: AsyncSession, bot_id: int, level: str, message: str) -> Log:
+async def get_statistics(session: AsyncSession, instance_id: int) -> Optional[Statistics]:
+    """Get statistics for an instance."""
+    from sqlalchemy import select
+    result = await session.execute(select(Statistics).where(Statistics.instanceId == instance_id))
+    return result.scalar_one_or_none()
+
+
+async def add_log(session: AsyncSession, instance_id: int, level: str, message: str) -> Log:
     """Add a log entry."""
-    log = Log(bot_id=bot_id, level=level, message=message)
+    log = Log(instanceId=instance_id, level=level, message=message)
     session.add(log)
     await session.commit()
     await session.refresh(log)
     return log
 
 
-async def get_logs(session: AsyncSession, bot_id: int, limit: int = 100) -> List[Log]:
-    """Get recent logs for a bot."""
+async def get_logs(session: AsyncSession, instance_id: int, limit: int = 100) -> List[Log]:
+    """Get recent logs for an instance."""
     from sqlalchemy import select, desc
     result = await session.execute(
         select(Log)
-        .where(Log.bot_id == bot_id)
-        .order_by(desc(Log.created_at))
+        .where(Log.instanceId == instance_id)
+        .order_by(desc(Log.createdAt))
         .limit(limit)
     )
     return result.scalars().all()

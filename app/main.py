@@ -1,6 +1,6 @@
 """
 Main FastAPI application for Discord Automation.
-Integrates bot management, REST API, and WebSocket communication.
+Integrates bot management, REST API, tRPC Bridge, and serves frontend static files.
 """
 
 import os
@@ -9,11 +9,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 from .database import init_db, close_db
 from .routes import router as api_router
+from .trpc_bridge import router as trpc_router
 from .websocket import router as ws_router
 
 # Load environment variables
@@ -31,13 +33,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Manage application lifecycle.
-    Initialize database on startup, close connections on shutdown.
-    """
+    """Manage application lifecycle."""
     logger.info("Starting Discord Automation API...")
-    
-    # Startup
     try:
         await init_db()
         logger.info("Database initialized successfully")
@@ -47,7 +44,6 @@ async def lifespan(app: FastAPI):
     
     yield
     
-    # Shutdown
     logger.info("Shutting down Discord Automation API...")
     try:
         await close_db()
@@ -68,32 +64,13 @@ app = FastAPI(
 
 # ==================== MIDDLEWARE ====================
 
-# CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Trusted Host Middleware
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=os.getenv("ALLOWED_HOSTS", "*").split(",")
-)
-
-
-# ==================== ERROR HANDLERS ====================
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    """Global exception handler."""
-    logger.error(f"Unhandled exception: {exc}")
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error"}
-    )
 
 
 # ==================== ROUTES ====================
@@ -101,29 +78,45 @@ async def global_exception_handler(request, exc):
 # Include API routes
 app.include_router(api_router)
 
+# Include tRPC Bridge
+app.include_router(trpc_router)
+
 # Include WebSocket routes
 app.include_router(ws_router)
 
 
-# ==================== HEALTH CHECK ====================
+# ==================== FRONTEND SERVING ====================
 
-@app.get("/")
-async def root():
-    """Root endpoint."""
-    return {
-        "message": "Discord Automation API",
-        "version": "1.0.0",
-        "status": "running"
-    }
-
+# Serve static files from the frontend build
+frontend_path = os.path.join(os.getcwd(), "dist", "public")
 
 @app.get("/health")
 async def health():
-    """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "message": "API is running"
-    }
+    return {"status": "healthy"}
+
+if os.path.exists(frontend_path):
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_path, "assets")), name="assets")
+    
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # If the path looks like an API call, return 404
+        if full_path.startswith("api/"):
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+        
+        # Serve index.html for all other paths (SPA support)
+        index_file = os.path.join(frontend_path, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        return JSONResponse(status_code=404, content={"detail": "Frontend not built"})
+else:
+    @app.get("/")
+    async def root():
+        return {
+            "message": "Discord Automation API",
+            "version": "1.0.0",
+            "status": "running",
+            "frontend": "Not built yet"
+        }
 
 
 # ==================== STARTUP ====================
@@ -131,8 +124,8 @@ async def health():
 if __name__ == "__main__":
     import uvicorn
     
-    host = os.getenv("API_HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", os.getenv("API_PORT", 8000)))
+    host = "0.0.0.0"
+    port = int(os.getenv("PORT", 8000))
     
     logger.info(f"Starting server on {host}:{port}")
     
@@ -140,6 +133,6 @@ if __name__ == "__main__":
         "app.main:app",
         host=host,
         port=port,
-        reload=os.getenv("FASTAPI_DEBUG", "False") == "True",
-        log_level=os.getenv("LOG_LEVEL", "info").lower()
+        reload=False,
+        log_level="info"
     )
