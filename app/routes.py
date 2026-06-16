@@ -11,7 +11,8 @@ import json
 from .database import (
     get_session, get_user, get_instance, get_user_instances,
     get_instance_settings, update_instance_settings,
-    get_statistics, get_logs, add_log, Instance, InstanceSettings, Statistics, Log, User
+    get_statistics, get_logs, add_log, create_instance,
+    Instance, InstanceSettings, Statistics, Log, User
 )
 from .bot_manager import bot_manager
 
@@ -101,7 +102,6 @@ async def list_instances(user_id: int = 1, session: AsyncSession = Depends(get_s
 async def create_new_instance_api(data: Dict[str, Any], session: AsyncSession = Depends(get_session)):
     user_id = data.get("userId", 1)
     name = data.get("name", "Nova Instância")
-    from .database import create_instance
     instance = await create_instance(session, user_id, name)
     return instance
 
