@@ -25,13 +25,25 @@ export async function handleAutomation(client: Client, message: Message, setting
   // 2. Filtro de Categoria (Pai do Canal)
   const categoryName = channel.parent?.name?.toLowerCase() || "";
   const targetCategory = (settings.category || "Mobile").toLowerCase();
-  if (!categoryName.includes(targetCategory)) return;
+  
+  // Se a categoria for "Qualquer", ignoramos o filtro. Caso contrário, verificamos se o nome contém o alvo.
+  if (targetCategory !== "qualquer" && !categoryName.includes(targetCategory)) {
+    // console.log(`[Debug] Categoria ignorada: ${categoryName} (Esperado: ${targetCategory})`);
+    return;
+  }
 
   // 3. Filtro de Modos (Nome do Canal)
   const channelName = channel.name?.toLowerCase() || "";
-  const selectedModes = settings.selectedModes || ['1x1', '2x2', '3x3', '4x4'];
+  let selectedModes = settings.selectedModes || ['1x1', '2x2', '3x3', '4x4'];
+  if (typeof selectedModes === 'string') {
+    try { selectedModes = JSON.parse(selectedModes); } catch (e) { selectedModes = ['1x1', '2x2', '3x3', '4x4']; }
+  }
+  
   const matchedMode = selectedModes.find((mode: string) => channelName.includes(mode.toLowerCase()));
-  if (!matchedMode) return;
+  if (!matchedMode) {
+    // console.log(`[Debug] Modo ignorado: ${channelName} (Selecionados: ${selectedModes.join(", ")})`);
+    return;
+  }
 
   try {
     processing.add(channel.id);
