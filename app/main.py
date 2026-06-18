@@ -8,7 +8,6 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
@@ -87,15 +86,18 @@ app.include_router(ws_router)
 
 # ==================== FRONTEND SERVING ====================
 
-# Serve static files from the frontend build
-frontend_path = os.path.join(os.getcwd(), "dist", "public")
+# In Docker, the frontend build is copied to /app/static
+frontend_path = "/app/static"
 
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
 
 if os.path.exists(frontend_path):
-    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_path, "assets")), name="assets")
+    # Serve assets directory if it exists
+    assets_path = os.path.join(frontend_path, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
     
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
@@ -103,11 +105,16 @@ if os.path.exists(frontend_path):
         if full_path.startswith("api/"):
             return JSONResponse(status_code=404, content={"detail": "Not found"})
         
+        # Check if requested path is a file in the static directory
+        file_path = os.path.join(frontend_path, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+            
         # Serve index.html for all other paths (SPA support)
         index_file = os.path.join(frontend_path, "index.html")
         if os.path.exists(index_file):
             return FileResponse(index_file)
-        return JSONResponse(status_code=404, content={"detail": "Frontend not built"})
+        return JSONResponse(status_code=404, content={"detail": "Frontend index.html not found"})
 else:
     @app.get("/")
     async def root():
@@ -115,7 +122,7 @@ else:
             "message": "Discord Automation API",
             "version": "1.0.0",
             "status": "running",
-            "frontend": "Not built yet"
+            "frontend": "Static directory not found at /app/static"
         }
 
 
@@ -125,7 +132,7 @@ if __name__ == "__main__":
     import uvicorn
     
     host = "0.0.0.0"
-    port = int(os.getenv("PORT", 8000))
+    port = int(os.getenv("PORT", 8080))
     
     logger.info(f"Starting server on {host}:{port}")
     
