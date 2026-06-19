@@ -87,43 +87,62 @@ app.include_router(ws_router)
 # ==================== FRONTEND SERVING ====================
 
 # In Docker, the frontend build is copied to /app/static
-frontend_path = "/app/static"
+# In local development, it might be in ../static
+frontend_path = os.environ.get("FRONTEND_PATH", "/app/static")
 
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
 
+@app.get("/api/status")
+async def status():
+    return {
+        "message": "Discord Automation API",
+        "version": "1.0.0",
+        "status": "running",
+        "frontend": "Configured" if os.path.exists(frontend_path) else "Not found"
+    }
+
+# Main route to serve index.html
+@app.get("/")
+async def root():
+    index_file = os.path.join(frontend_path, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return JSONResponse({
+        "message": "Discord Automation API",
+        "status": "running",
+        "frontend": "Not built yet. Please wait for the Docker build to complete."
+    })
+
+# Mount assets and other static files
 if os.path.exists(frontend_path):
-    # Serve assets directory if it exists
+    # Assets directory
     assets_path = os.path.join(frontend_path, "assets")
     if os.path.exists(assets_path):
         app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
     
-    @app.get("/{full_path:path}")
-    async def serve_frontend(full_path: str):
-        # If the path looks like an API call, return 404
-        if full_path.startswith("api/"):
-            return JSONResponse(status_code=404, content={"detail": "Not found"})
-        
-        # Check if requested path is a file in the static directory
-        file_path = os.path.join(frontend_path, full_path)
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
-            
-        # Serve index.html for all other paths (SPA support)
-        index_file = os.path.join(frontend_path, "index.html")
-        if os.path.exists(index_file):
-            return FileResponse(index_file)
-        return JSONResponse(status_code=404, content={"detail": "Frontend index.html not found"})
-else:
-    @app.get("/")
-    async def root():
-        return {
-            "message": "Discord Automation API",
-            "version": "1.0.0",
-            "status": "running",
-            "frontend": "Static directory not found at /app/static"
-        }
+    # Mount the rest of static files at the end
+    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+
+# Catch-all route for SPA support
+@app.get("/{full_path:path}")
+async def catch_all(full_path: str):
+    # Ignore API calls
+    if full_path.startswith("api/") or full_path.startswith("trpc/"):
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
+    
+    # Check if it's a file
+    file_path = os.path.join(frontend_path, full_path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+    
+    # Return index.html for all other paths (React Router)
+    index_file = os.path.join(frontend_path, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    
+    return JSONResponse(status_code=404, content={"detail": "Frontend index.html not found"})
 
 
 # ==================== STARTUP ====================
