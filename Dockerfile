@@ -7,6 +7,8 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 # Install dependencies
 RUN pnpm install --frozen-lockfile
+# Clean pnpm cache to reduce image size and memory usage during build
+RUN pnpm store prune
 # Copy all source files
 COPY . .
 # Build the frontend using Vite
@@ -31,8 +33,8 @@ RUN pip install gunicorn uvicorn
 COPY app/ ./app/
 
 # Copy built frontend from previous stage
-# The build output goes to dist/ directory by default in Vite
-COPY --from=frontend-build /app/dist ./static
+# The build output goes to dist/public directory as per vite.config.ts
+COPY --from=frontend-build /app/dist/public ./static
 
 # Expose port
 ENV PORT=8080
