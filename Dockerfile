@@ -10,7 +10,8 @@ RUN pnpm install --frozen-lockfile
 # Clean pnpm cache to reduce image size and memory usage during build
 RUN pnpm store prune
 # Copy all source files
-COPY . .
+COPY client ./client
+COPY package.json pnpm-lock.yaml vite.config.ts ./
 # Build the frontend using Vite
 RUN pnpm run build
 
