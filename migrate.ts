@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
-import { getDb } from "./server/_core/db";
+import { getDb } from "./server/db";
 
 export async function runMigrations() {
   try {
